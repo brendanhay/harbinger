@@ -1,7 +1,20 @@
+%% This Source Code Form is subject to the terms of
+%% the Mozilla Public License, v. 2.0.
+%% A copy of the MPL can be found in the LICENSE file or
+%% you can obtain it at http://mozilla.org/MPL/2.0/.
+%%
+%% @author Brendan Hay
+%% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
+%% @doc
+%%
+
 -module(railgun_vnode).
+
 -behaviour(riak_core_vnode).
+
 -include("railgun.hrl").
 
+%% Callbacks
 -export([start_vnode/1,
          init/1,
          terminate/2,
@@ -17,9 +30,16 @@
          handle_coverage/4,
          handle_exit/3]).
 
+%%
+%% Types
+%%
+
 -record(state, {partition}).
 
-%% API
+%%
+%% Callbacks
+%%
+
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 

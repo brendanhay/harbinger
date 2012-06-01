@@ -38,4 +38,4 @@ erldocs
 .DS_Store
 
 # Protobufs
-include/cap_pb.hrl
+*_pb.hrl
