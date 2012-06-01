@@ -1,0 +1,24 @@
+{application, cap, [
+  {description, "Capacitor"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [
+      kernel,
+      stdlib,
+      lager,
+      gproc,
+      cowboy
+  ]},
+  {mod, {cap, []}},
+  {env, [
+      {tcp, [
+          {keepalive, true}
+      ]},
+
+      {listeners, [
+          [{ip, "0.0.0.0"},
+           {port, 5672},
+           {acceptors, 30}]
+      ]}
+  ]}
+]}.
