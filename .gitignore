@@ -13,7 +13,7 @@ log
 logs
 doc
 src/typer_ann
-rel/package
+rel/railgun
 priv
 
 # Exec
