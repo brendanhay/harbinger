@@ -76,7 +76,7 @@ stop(_Args) -> ok.
 start(App) -> ensure_started(App, application:start(App, permanent)).
 
 -spec ensure_started(atom(), ok | {error, {already_started, atom()} |
-                     {not_started, atom()}}) -> ok.
+                                   {not_started, atom()}}) -> ok.
 %% @private
 ensure_started(_App, ok) ->
     ok;

@@ -77,11 +77,11 @@ APPS=kernel stdlib sasl erts ssl \
 
 build-plt: all
 	dialyzer --build_plt --output_plt $(PLT) \
-	  --apps $(APPS) $(DEPS)
+	--apps $(APPS) $(DEPS)
 
-dialyzer: build
-	dialyzer ebin --plt $(PLT) $(WARNINGS) \
-	  | grep -v 'lager_not_running'
+dialyzer: compile
+	dialyzer ./apps/railgun/ebin --plt $(PLT) $(WARNINGS) \
+	| grep -v 'lager_not_running'
 
 xref:
 	$(REBAR) skip_deps=true xref
