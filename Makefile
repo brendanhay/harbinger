@@ -31,10 +31,6 @@ rel: all
 relclean:
 	rm -rf rel/railgun
 
-#
-# Docs
-#
-
 docs:
 	$(REBAR) skip_deps=true doc
 
@@ -42,13 +38,17 @@ docs:
 # Dev
 #
 
-stage : rel
-	$(foreach dep,$(wildcard deps/* wildcard apps/*), rm -rf rel/railgun/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/railgun/lib;)
+stage: rel
+	$(foreach dep, $(wildcard deps/* wildcard apps/*), \
+	rm -rf rel/railgun/lib/$(shell basename $(dep))-* && \
+	ln -sf $(abspath $(dep)) rel/railgun/lib;)
 
 
 stagedevrel: dev1 dev2 dev3
-	$(foreach dev,$^,\
-	$(foreach dep,$(wildcard deps/* wildcard apps/*), rm -rf dev/$(dev)/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) dev/$(dev)/lib;))
+	$(foreach dev, $^,\
+	$(foreach dep, $(wildcard deps/* wildcard apps/*), \
+	rm -rf dev/$(dev)/lib/$(shell basename $(dep))-* \
+	&& ln -sf $(abspath $(dep)) dev/$(dev)/lib;))
 
 devrel: dev1 dev2 dev3
 

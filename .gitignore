@@ -11,10 +11,10 @@ bin
 ebin
 log
 logs
+dev
 doc
-src/typer_ann
-rel/railgun
 priv
+rel/railgun
 
 # Exec
 rebar
