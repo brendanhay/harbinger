@@ -33,7 +33,10 @@ start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 -spec init([]) -> {ok, {{one_for_one, 5, 10}, [supervisor:child_spec()]}}.
 %% @hidden
 init(_Args) ->
-    VMaster = {railgun_vnode_master,
-               {riak_core_vnode_master, start_link, [railgun_vnode]},
-               permanent, 5000, worker, [riak_core_vnode_master]},
-    {ok, {{one_for_one, 5, 10}, [VMaster]}}.
+    TopicMaster = {railgun_topic_vnode_master,
+                   {riak_core_vnode_master, start_link, [railgun_topic_vnode]},
+                   permanent, 5000, worker, [riak_core_vnode_master]},
+    QueueMaster = {railgun_queue_vnode_master,
+                   {riak_core_vnode_master, start_link, [railgun_queue_vnode]},
+                   permanent, 5000, worker, [riak_core_vnode_master]},
+    {ok, {{one_for_one, 5, 10}, [TopicMaster, QueueMaster]}}.
