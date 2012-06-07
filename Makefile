@@ -1,7 +1,7 @@
 REBAR = `which rebar`
 DEPS=deps/*/ebin
 
-.PHONY: deps rel stagedevrel
+.PHONY: deps rel dev
 
 #
 # Targets
@@ -48,7 +48,7 @@ devstart:
 	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun start && $(d)/bin/railgun ping;)
 
 devjoin:
-	$(foreach d, $(wildcard dev/dev*), sleep 0.5 && $(d)/bin/railgun-admin join railgun1@127.0.0.1;)
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun-admin join railgun1@127.0.0.1;)
 
 dev: devclean devrel devstart devjoin
 	./dev/dev1/bin/railgun-admin member_status
