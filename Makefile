@@ -16,20 +16,16 @@ compile:
 deps:
 	$(REBAR) get-deps
 
-clean:
+clean: devclean
+	rm -rf rel/railgun
 	$(REBAR) clean
-
-distclean: clean devclean relclean
 	$(REBAR) delete-deps
 
 test:
 	$(REBAR) skip_deps=true eunit
 
 rel: all
-	$(REBAR) generate
-
-relclean:
-	rm -rf rel/railgun
+	$(REBAR) generate -f
 
 docs:
 	$(REBAR) skip_deps=true doc
@@ -38,26 +34,24 @@ docs:
 # Dev
 #
 
-stage: rel
-	$(foreach dep, $(wildcard deps/* wildcard apps/*), \
-	rm -rf rel/railgun/lib/$(shell basename $(dep))-* && \
-	ln -sf $(abspath $(dep)) rel/railgun/lib;)
-
-
-stagedevrel: dev1 dev2 dev3
-	$(foreach dev, $^,\
-	$(foreach dep, $(wildcard deps/* wildcard apps/*), \
-	rm -rf dev/$(dev)/lib/$(shell basename $(dep))-* \
-	&& ln -sf $(abspath $(dep)) dev/$(dev)/lib;))
+devclean:
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun stop;)
+	rm -rf dev
 
 devrel: dev1 dev2 dev3
-
-devclean:
-	rm -rf dev
 
 dev1 dev2 dev3: all
 	mkdir -p dev
 	(cd rel && $(REBAR) generate target_dir=../dev/$@ overlay_vars=vars/$@.config)
+
+devstart:
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun start && $(d)/bin/railgun ping;)
+
+devjoin:
+	$(foreach d, $(wildcard dev/dev*), sleep 0.5 && $(d)/bin/railgun-admin join railgun1@127.0.0.1;)
+
+dev: devclean devrel devstart devjoin
+	./dev/dev1/bin/railgun-admin member_status
 
 #
 # Analysis
