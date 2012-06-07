@@ -12,6 +12,8 @@
 
 -behaviour(gen_event).
 
+-include("railgun.hrl").
+
 %% Callbacks
 -export([init/1,
          handle_event/2,
@@ -24,22 +26,25 @@
 %% Types
 %%
 
--record(state, {}).
+-record(s, {}).
 
 %%
 %% Callbacks
 %%
 
 init([]) ->
-    {ok, #state{}}.
+    {ok, #s{}}.
 
-handle_event({service_update, _Services}, State) ->
+handle_event({service_update, Services}, State) ->
+    lager:info("Node Service Event ~p ~p", [Services, State]),
     {ok, State}.
 
-handle_call(_Event, State) ->
+handle_call(Event, State) ->
+    lager:info("Node Call ~p", [Event]),
     {ok, ok, State}.
 
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:info("Node Info ~p", [Info]),
     {ok, State}.
 
 terminate(_Reason, _State) ->

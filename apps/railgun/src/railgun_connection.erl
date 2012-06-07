@@ -27,12 +27,9 @@
          code_change/4]).
 
 %% States
--export([handshaking/2,
-         handshaking/3,
-         proxying/2,
-         closing/2]).
+%% -export([]).
 
--record(s, {}).
+-record(s, {sock :: inet:socket()}).
 
 %%
 %% API
@@ -63,15 +60,16 @@ handle_sync_event(_Event, _From, StateName, State) ->
     {reply, ok, StateName, State}.
 
 %% @hidden
-handle_info(_Msg, _Any, State) ->
-    {next_state, closing, State};
-handle_info({shoot, Listener}, accepting, State) ->
-    {next_state, handshaking, State}.
+handle_info({shoot, _Listener}, accepting, State) ->
+    {next_state, handshaking, State};
+handle_info(_Msg, StateName, State) ->
+    {next_state, StateName, State}.
 
 %% @hidden
-terminate(Reason, StateName, State) ->
+terminate(_Reason, _StateName, State) ->
     close(State).
 
+%% @hidden
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
@@ -87,8 +85,8 @@ send(Sock, Data) ->
         Error -> lager:debug("CONN-CLOSED ~p - ~p", [Error, Data])
     end.
 
--spec close_sock(#s{}) -> ok.
+-spec close(#s{}) -> ok.
 %% @private
 close(#s{sock = Sock}) ->
-    send(Sock, <<"ERROR">>),
+    ok = send(Sock, <<"ERROR">>),
     gen_tcp:close(Sock).

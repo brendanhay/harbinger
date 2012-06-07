@@ -53,7 +53,8 @@ ping() ->
 start(_StartType, _StartArgs) ->
     case railgun_sup:start_link() of
         {ok, Pid} ->
-            ok = riak_core:register([{vnode_module, railgun_vnode}]),
+            ok = riak_core:register([{vnode_module, railgun_topic_vnode}]),
+            ok = riak_core:register([{vnode_module, railgun_queue_vnode}]),
             ok = riak_core_ring_events:add_guarded_handler(railgun_ring_event_handler, []),
             ok = riak_core_node_watcher_events:add_guarded_handler(railgun_node_event_handler, []),
             ok = riak_core_node_watcher:service_up(railgun, self()),
