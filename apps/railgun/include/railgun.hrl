@@ -39,18 +39,12 @@
 -type truth_m() :: true | false.
 
 %%
-%% Records
+%% Macros
 %%
 
-%% -include("railgun_pb.hrl").
-
-%%
-%% GProc
-%%
-
--define(AGGR(Name), {a, l, {?MODULE, Name}}).
--define(CNTR(Name), {c, l, {?MODULE, Name}}).
--define(PROP(Name), {p, l, {?MODULE, Name}}).
+-define(N, 3).
+-define(R, 2).
+-define(W, 2).
 
 %%
 %% Tests

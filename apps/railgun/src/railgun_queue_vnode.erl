@@ -15,10 +15,11 @@
 -include("railgun.hrl").
 
 %% API
--export([start_vnode/1]).
+-export([enqueue/5]).
 
 %% Callbacks
--export([init/1,
+-export([start_vnode/1,
+         init/1,
          terminate/2,
          handle_command/3,
          is_empty/1,
@@ -33,10 +34,24 @@
          handle_exit/3]).
 
 %%
+%% Macros
+%%
+
+-define(MASTER, railgun_queue_vnode_master).
+
+%%
 %% Types
 %%
 
 -record(s, {partition}).
+
+%%
+%% API
+%%
+
+enqueue(PrefList, ReqId, Topic, Queue, Msg) ->
+    Cmd = {enqueue, ReqId, Topic, Queue, Msg},
+    riak_core_vnode_master:command(PrefList, Cmd, ?MASTER).
 
 %%
 %% Callbacks
