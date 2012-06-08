@@ -35,8 +35,8 @@
 init([]) ->
     {ok, #s{}}.
 
-handle_event({service_update, Services}, State) ->
-    lager:info("Node Service Event ~p on ~p", [Services, self()]),
+handle_event({service_update, _Services}, State) ->
+    lager:info("Node Service Update Event on ~p", [self()]),
     {ok, State}.
 
 handle_call(Event, State) ->

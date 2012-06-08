@@ -82,9 +82,9 @@ stop(_Args) -> ok.
 
 ping(Key, VNode) ->
     DocIdx = riak_core_util:chash_key(Key),
-    [{IndexNode, _Type}] = riak_core_apl:get_primary_apl(DocIdx, 1, railgun),
-    lager:info("IndexNode: ~p", [IndexNode]),
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, VNode).
+    [{IdxNode = {_Hash, Host}, _Type}] =
+        riak_core_apl:get_primary_apl(DocIdx, 1, railgun),
+    {riak_core_vnode_master:sync_spawn_command(IdxNode, ping, VNode), Host}.
 
 -spec start(atom()) -> ok.
 %% @doc

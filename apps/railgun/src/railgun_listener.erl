@@ -13,21 +13,21 @@
 -include("railgun.hrl").
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %%
 %% API
 %%
 
--spec start_link() -> {ok, pid()}.
+-spec start_link(inet:port_number()) -> {ok, pid()}.
 %% @doc
-start_link() ->
+start_link(Port) ->
     case cowboy:start_listener(
            tcp_listener, 100,
-           cowboy_tcp_transport, [{port, 5600}],
+           cowboy_tcp_transport, [{port, Port}],
            railgun_connection_sup, []) of
         {ok, Pid} ->
-            lager:info("Listening on 0.0.0.0:5600"),
+            lager:info("Listening on 0.0.0.0:~p", [Port]),
             {ok, Pid};
         Error ->
             lager:error("Listener failed to start ~p", [Error]),

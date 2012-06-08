@@ -35,8 +35,8 @@
 init([]) ->
     {ok, #s{}}.
 
-handle_event({ring_update, Ring}, State) ->
-    lager:info("Update Event ~p on ~p", [Ring, self()]),
+handle_event({ring_update, _Ring}, State) ->
+    lager:info("Ring Update Event on ~p", [self()]),
     {ok, State}.
 
 handle_call(Event, State) ->
