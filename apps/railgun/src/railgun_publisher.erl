@@ -101,7 +101,7 @@ execute(timeout, State = #s{req_id   = ReqId,
 %% @doc Wait for W enqueue reqs to respond.
 waiting({ok, ReqId}, State = #s{from = From, write_replies = W}) ->
     IncW = W + 1,
-    NewState = State#s{ write_replies = IncW },
+    NewState = State#s{write_replies = IncW},
     if
         IncW =:= ?W ->
             From ! {ReqId, ok},

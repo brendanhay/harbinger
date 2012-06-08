@@ -51,6 +51,7 @@
 
 enqueue(PrefList, ReqId, Topic, Queue, Msg) ->
     Cmd = {enqueue, ReqId, Topic, Queue, Msg},
+    lager:info("Enqueue: ~p", [Cmd]),
     riak_core_vnode_master:command(PrefList, Cmd, ?MASTER).
 
 %%
