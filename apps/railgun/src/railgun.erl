@@ -18,7 +18,9 @@
 %% API
 -export([start/0,
          stop/0,
-         ping/0]).
+         topic/0,
+         queue/0,
+         queue/2]).
 
 %% Callbacks
 -export([start/2,
@@ -38,11 +40,18 @@ stop() ->
     ok = application:stop(?MODULE),
     init:stop().
 
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    [{IndexNode, _Type}] = riak_core_apl:get_primary_apl(DocIdx, 1, railgun),
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, railgun_vnode_master).
+%% @doc Ping a random topic vnode
+topic() ->
+    ping({<<"ping">>, term_to_binary(now())}, railgun_topic_vnode_master).
+
+%% @doc Ping a random queue vnode
+queue() ->
+    ping({<<"ping">>, term_to_binary(now())}, railgun_queue_vnode_master).
+
+%% @doc Ping a specific queue vnode
+queue(Topic, Queue) ->
+    ping({list_to_binary(Topic), list_to_binary(Queue)},
+         railgun_queue_vnode_master).
 
 %%
 %% Callbacks
@@ -70,6 +79,12 @@ stop(_Args) -> ok.
 %%
 %% Private
 %%
+
+ping(Key, VNode) ->
+    DocIdx = riak_core_util:chash_key(Key),
+    [{IndexNode, _Type}] = riak_core_apl:get_primary_apl(DocIdx, 1, railgun),
+    lager:info("IndexNode: ~p", [IndexNode]),
+    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, VNode).
 
 -spec start(atom()) -> ok.
 %% @doc

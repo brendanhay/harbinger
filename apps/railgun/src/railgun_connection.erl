@@ -27,7 +27,8 @@
          code_change/4]).
 
 %% States
-%% -export([]).
+-export([handshaking/2,
+         active/2]).
 
 -record(s, {sock :: inet:socket()}).
 
@@ -72,6 +73,46 @@ terminate(_Reason, _StateName, State) ->
 %% @hidden
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
+
+%%
+%% States
+%%
+
+%% Connecting
+%%
+%% A STOMP client initiates the stream or TCP connection to the server
+%% by sending the CONNECT frame:
+
+%% CONNECT
+%% accept-version:1.1
+%% host:stomp.github.org
+%%
+%% ^@
+
+%% If the server accepts the connection attempt it will
+%% respond with a CONNECTED frame:
+
+%% CONNECTED
+%% version:1.1
+%%
+%% ^@
+
+%% The server can reject any connection attempt.
+%% The server SHOULD respond back with an ERROR frame listing
+%% why the connection was rejected and then close the connection.
+%% STOMP servers MUST support clients which rapidly connect and disconnect.
+%% This implies a server will likely only allow closed connections to
+%% linger for short time before the connection is reset.
+%% This means that a client may not receive the ERROR frame
+%% before the socket is reset.
+
+handshaking(_Event, State = #s{sock = Sock}) ->
+    ok = inet:setopts(Sock, [{active, once}]),
+    
+    {next_state, active, State}.
+
+active(_Event, State) ->
+    {next_state, active, State}.
 
 %%
 %% Private

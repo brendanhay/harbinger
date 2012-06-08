@@ -25,7 +25,7 @@ start_link() ->
     case cowboy:start_listener(
            tcp_listener, 100,
            cowboy_tcp_transport, [{port, 5600}],
-           railgun_connection, []) of
+           railgun_connection_sup, []) of
         {ok, Pid} ->
             lager:info("Listening on 0.0.0.0:5600"),
             {ok, Pid};
