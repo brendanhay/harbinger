@@ -58,11 +58,9 @@ enqueue(PrefList, ReqId, Topic, Queue, Msg) ->
 %% Callbacks
 %%
 
-start_vnode(I) ->
-    riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
+start_vnode(I) -> riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
-init([Partition]) ->
-    {ok, #s{partition = Partition}}.
+init([Partition]) -> {ok, #s{partition = Partition}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
