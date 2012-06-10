@@ -5,8 +5,9 @@
   {applications, [
       kernel,
       stdlib,
+      sasl,
       lager,
-      gproc,
+      cowboy,
       riak_core
   ]},
   {mod, {harbinger, []}},

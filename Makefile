@@ -7,11 +7,13 @@ DEPS=deps/*/ebin
 # Targets
 #
 
-all: deps compile
+all: deps compile xref
 
 compile:
 	$(REBAR) compile
-	$(MAKE) xref
+
+build:
+	$(REBAR) skip_deps=true compile
 
 deps:
 	$(REBAR) get-deps
@@ -24,7 +26,7 @@ clean: devclean
 test:
 	$(REBAR) skip_deps=true eunit
 
-rel: all
+rel: build
 	$(REBAR) generate -f
 
 docs:
@@ -40,7 +42,7 @@ devclean:
 
 devrel: dev1 dev2 dev3
 
-dev1 dev2 dev3: all
+dev1 dev2 dev3: build
 	mkdir -p dev
 	(cd rel && $(REBAR) generate target_dir=../dev/$@ overlay_vars=vars/$@.config)
 
@@ -74,7 +76,7 @@ build-plt: all
 	dialyzer --build_plt --output_plt $(PLT) \
 	--apps $(APPS) $(DEPS)
 
-dialyzer: compile
+dialyzer: build
 	dialyzer ./apps/harbinger/ebin --plt $(PLT) $(WARNINGS) \
 	| grep -v 'lager_not_running'
 
