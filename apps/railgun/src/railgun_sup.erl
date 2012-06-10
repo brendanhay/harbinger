@@ -8,7 +8,7 @@
 %% @doc
 %%
 
--module(railgun_sup).
+-module(harbinger_sup).
 
 -behaviour(supervisor).
 
@@ -33,17 +33,14 @@ start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 -spec init([]) -> {ok, {{one_for_one, 5, 10}, [supervisor:child_spec()]}}.
 %% @hidden
 init(_Args) ->
-    {ok, Port} = application:get_env(railgun, stomp_port),
-    TcpListener = {railgun_listener,
-                   {railgun_listener, start_link, [Port]},
-                   permanent, 5000, worker, [railgun_listener]},
-    TopicMaster = {railgun_topic_vnode_master,
-                   {riak_core_vnode_master, start_link, [railgun_topic_vnode]},
+    {ok, Port} = application:get_env(harbinger, stomp_port),
+    TcpListener = {harbinger_listener,
+                   {harbinger_listener, start_link, [Port]},
+                   permanent, 5000, worker, [harbinger_listener]},
+    TopicMaster = {harbinger_topic_vnode_master,
+                   {riak_core_vnode_master, start_link, [harbinger_topic_vnode]},
                    permanent, 5000, worker, [riak_core_vnode_master]},
-    QueueMaster = {railgun_queue_vnode_master,
-                   {riak_core_vnode_master, start_link, [railgun_queue_vnode]},
+    QueueMaster = {harbinger_queue_vnode_master,
+                   {riak_core_vnode_master, start_link, [harbinger_queue_vnode]},
                    permanent, 5000, worker, [riak_core_vnode_master]},
-    PublisherSup = {railgun_publisher_sup,
-                    {railgun_publisher_sup, start_link, []},
-                    permanent, infinity, supervisor, [railgun_publisher_sup]},
-    {ok, {{one_for_one, 5, 10}, [TcpListener, TopicMaster, QueueMaster, PublisherSup]}}.
+    {ok, {{one_for_one, 5, 10}, [TcpListener, TopicMaster, QueueMaster]}}.

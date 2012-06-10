@@ -5,12 +5,12 @@
 %%
 %% @author Brendan Hay
 %% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
-%% @doc Used by the `railgun-admin` script
+%% @doc Used by the `harbinger-admin` script
 %%
 
--module(railgun_console).
+-module(harbinger_console).
 
--include("include/railgun.hrl").
+-include("include/harbinger.hrl").
 
 %% Callbacks
 -export([join/1,

@@ -5,56 +5,64 @@
 %%
 %% @author Brendan Hay
 %% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
-%% @doc Used by the `railgun-admin` script
+%% @doc Used by the `harbinger-admin` script
 %%
 
--module(railgun_connection_sup).
+-module(harbinger_connection_sup).
 
-%% -behaviour(supervisor2).
+-behaviour(supervisor2).
 
-%% %% API
-%% -export([start_link/0]).
+%% API
+-export([start_link/4]).
 
-%% %% Callbacks
-%% -export([init/1]).
+%% Callbacks
+-export([init/1]).
 
-%% %%
-%% %% API
-%% %%
+%%
+%% API
+%%
 
-%% -spec start_link(pid(), inet:socket(), cowboy_tcp_transport, []) ->
-%%                         {ok, pid()} | ignore | {error, _}.
-%% %% @doc
-%% start_link(_Listener, Sock, cowboy_tcp_transport, []) ->
-%%     {ok, SupPid}       = supervisor2:start_link(?MODULE, []),
-%%     {ok, ProcessorPid} = start_processor(SupPid, Sock),
-%%     {ok, _ReaderPid}   = start_reader(SupPid, ProcessorPid, Sock),
-%%     {ok, SupPid}.
+-spec start_link(pid(), inet:socket(), cowboy_tcp_transport, []) ->
+                        {ok, pid()} | ignore | {error, _}.
+%% @doc
+start_link(_Listener, Sock, cowboy_tcp_transport, []) ->
+    %% We want the connection to be transient since when it exits normally
+    %% the processor may have some work still to do (and the connection
+    %% tells the processor to exit). However, if the connection terminates
+    %% abnormally then we want to take everything down.
+    %%
+    %% The *processor* however is intrinsic, so when it exits, the
+    %% supervisor2 goes too.
+    {ok, SupPid}        = supervisor2:start_link(?MODULE, []),
+    {ok, ProcessorPid}  = start_processor(SupPid, Sock),
+    {ok, ConnectionPid} = start_connection(SupPid, ProcessorPid, Sock),
+    %% ok                  = gen_tcp:controlling_process(Sock, ConnectionPid),
+    {ok, SupPid}.
 
-%% %%
-%% %% Callbacks
-%% %%
+%%
+%% Callbacks
+%%
 
-%% -spec init([]) -> {ok, {{one_for_all, 0, 1}, [supervisor:child_spec()]}}.
-%% %% @hidden
-%% init([]) -> {ok, {{one_for_all, 0, 1}, []}}.
+-spec init([]) -> {ok, {{one_for_all, 0, 1}, [supervisor2:child_spec()]}}.
+%% @hidden
+init([]) -> {ok, {{one_for_all, 0, 1}, []}}.
 
-%% %%
-%% %% Private
-%% %%
+%%
+%% Private
+%%
 
-%% -spec start_processor(pid(), inet:socket()) -> {ok, pid()}.
-%% %% @private
-%% start_processor(SupPid, Sock) ->
-%%     Spec = {railgun_processor,
-%%             {railgun_processor, start_link, [Sock]},
-%%             permanent, 5000, worker, [railgun_processor]},
-%%     supervisor2:start_child(SupPid, Spec).
+-spec start_processor(pid(), inet:socket()) -> {ok, pid()}.
+%% @private
+start_processor(SupPid, Sock) ->
+    Spec = {harbinger_processor,
+            {harbinger_processor, start_link, [SupPid, Sock]},
+            intrinsic, 5000, worker, [harbinger_processor]},
+    supervisor2:start_child(SupPid, Spec).
 
-%% -spec start_reader(pid(), inet:socket()) -> {ok, pid()}.
-%% %% @private
-%% start_reader(SupPid, ProcessorPid, Sock) ->
-%%     Spec = {railgun_reader,
-%%             {railgun_reader, start_link, [ProcessorPid, Sock]},
-%%             transient, 5000, worker, [railgun_reader]},
-%%     supervisor2:start_child(SupPid, Spec).
+-spec start_connection(pid(), pid(), inet:socket()) -> {ok, pid()}.
+%% @private
+start_connection(SupPid, ProcessorPid, Sock) ->
+    Spec = {harbinger_connection,
+            {harbinger_connection, start_link, [SupPid, ProcessorPid, Sock]},
+            transient, 2000, worker, [harbinger_connection]},
+    supervisor2:start_child(SupPid, Spec).

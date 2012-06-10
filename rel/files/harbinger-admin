@@ -86,12 +86,12 @@ run()
 case "$1" in
     join)
         shift
-        run railgun_console join $@
+        run harbinger_console join $@
         ;;
 
     leave)
         shift
-        run railgun_console leave $@
+        run harbinger_console leave $@
         ;;
 
     remove)
@@ -101,7 +101,7 @@ case "$1" in
         fi
 
         shift
-        run railgun_console remove $@
+        run harbinger_console remove $@
         ;;
 
     member_status)
@@ -160,7 +160,7 @@ case "$1" in
 
     ringready)
         shift
-        run railgun_console ringready $@
+        run harbinger_console ringready $@
         ;;
 
     *)

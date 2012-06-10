@@ -8,12 +8,12 @@
 %% @doc
 %%
 
--module(railgun).
+-module(harbinger).
 
 -behaviour(application).
 
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% API
 -export([start/0,
@@ -42,16 +42,16 @@ stop() ->
 
 %% @doc Ping a random topic vnode
 topic() ->
-    ping({<<"ping">>, term_to_binary(now())}, railgun_topic_vnode_master).
+    ping({<<"ping">>, term_to_binary(now())}, harbinger_topic_vnode_master).
 
 %% @doc Ping a random queue vnode
 queue() ->
-    ping({<<"ping">>, term_to_binary(now())}, railgun_queue_vnode_master).
+    ping({<<"ping">>, term_to_binary(now())}, harbinger_queue_vnode_master).
 
 %% @doc Ping a specific queue vnode
 queue(Topic, Queue) ->
     ping({list_to_binary(Topic), list_to_binary(Queue)},
-         railgun_queue_vnode_master).
+         harbinger_queue_vnode_master).
 
 %%
 %% Callbacks
@@ -60,13 +60,14 @@ queue(Topic, Queue) ->
 -spec start(normal, _) -> {ok, pid()} | {error, _}.
 %% @hidden
 start(_StartType, _StartArgs) ->
-    case railgun_sup:start_link() of
+    case harbinger_sup:start_link() of
         {ok, Pid} ->
-            ok = riak_core:register([{vnode_module, railgun_topic_vnode}]),
-            ok = riak_core:register([{vnode_module, railgun_queue_vnode}]),
-            ok = riak_core_ring_events:add_guarded_handler(railgun_ring_event_handler, []),
-            ok = riak_core_node_watcher_events:add_guarded_handler(railgun_node_event_handler, []),
-            ok = riak_core_node_watcher:service_up(railgun, self()),
+            ok = riak_core_ring_events:add_guarded_handler(harbinger_ring_event_handler, []),
+            ok = riak_core_node_watcher_events:add_guarded_handler(harbinger_node_event_handler, []),
+            ok = riak_core:register([{vnode_module, harbinger_topic_vnode}]),
+            ok = riak_core_node_watcher:service_up(harbinger_topic, self()),
+            ok = riak_core:register([{vnode_module, harbinger_queue_vnode}]),
+            ok = riak_core_node_watcher:service_up(harbinger_queue, self()),
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}
@@ -83,7 +84,7 @@ stop(_Args) -> ok.
 ping(Key, VNode) ->
     DocIdx = riak_core_util:chash_key(Key),
     [{IdxNode = {_Hash, Host}, _Type}] =
-        riak_core_apl:get_primary_apl(DocIdx, 1, railgun),
+        riak_core_apl:get_primary_apl(DocIdx, 1, harbinger),
     {riak_core_vnode_master:sync_spawn_command(IdxNode, ping, VNode), Host}.
 
 -spec start(atom()) -> ok.

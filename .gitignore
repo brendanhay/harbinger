@@ -14,7 +14,7 @@ logs
 dev
 doc
 priv
-rel/railgun
+rel/harbinger
 
 # Exec
 rebar

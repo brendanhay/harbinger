@@ -17,7 +17,7 @@ deps:
 	$(REBAR) get-deps
 
 clean: devclean
-	rm -rf rel/railgun
+	rm -rf rel/harbinger
 	$(REBAR) clean
 	$(REBAR) delete-deps
 
@@ -35,7 +35,7 @@ docs:
 #
 
 devclean:
-	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun stop;)
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/harbinger stop;)
 	rm -rf dev
 
 devrel: dev1 dev2 dev3
@@ -45,14 +45,14 @@ dev1 dev2 dev3: all
 	(cd rel && $(REBAR) generate target_dir=../dev/$@ overlay_vars=vars/$@.config)
 
 devstart:
-	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun start;)
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/harbinger start;)
 
 devjoin:
-	$(foreach d, $(wildcard dev/dev*), $(d)/bin/railgun-admin join railgun1@127.0.0.1;)
+	$(foreach d, $(wildcard dev/dev*), $(d)/bin/harbinger-admin join harbinger1@127.0.0.1;)
 
 dev: devclean devrel devstart devjoin
-	./dev/dev1/bin/railgun-admin member_status
-	./dev/dev1/bin/railgun attach
+	./dev/dev1/bin/harbinger-admin member_status
+	./dev/dev1/bin/harbinger attach
 
 #
 # Analysis
@@ -75,7 +75,7 @@ build-plt: all
 	--apps $(APPS) $(DEPS)
 
 dialyzer: compile
-	dialyzer ./apps/railgun/ebin --plt $(PLT) $(WARNINGS) \
+	dialyzer ./apps/harbinger/ebin --plt $(PLT) $(WARNINGS) \
 	| grep -v 'lager_not_running'
 
 xref:

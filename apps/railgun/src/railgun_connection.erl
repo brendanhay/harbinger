@@ -8,126 +8,80 @@
 %% @doc
 %%
 
--module(railgun_connection).
+-module(harbinger_connection).
 
--behaviour(gen_fsm).
--behaviour(cowboy_protocol).
-
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% API
--export([start_link/4]).
+-export([start_link/3]).
 
 %% Callbacks
--export([init/1,
-         handle_event/3,
-         handle_sync_event/4,
-         handle_info/3,
-         terminate/3,
-         code_change/4]).
+-export([init/3]).
 
-%% States
--export([handshaking/2,
-         active/2]).
+%%
+%% Types
+%%
 
--record(s, {sock :: inet:socket()}).
+-record(s, {sup                    :: pid(),
+            processor              :: pid(),
+            sock                   :: inet:socket(),
+            parser = restomp:new() :: restomp:parser()}).
 
 %%
 %% API
 %%
 
--spec start_link(pid(), inet:socket(), cowboy_tcp_transport, _)
-                -> {ok, pid()} | ignore | {error, _}.
+-spec start_link(pid(), pid(), inet:socket()) -> {ok, pid()} | ignore | {error, _}.
 %% @doc
-start_link(_Listener, Sock, cowboy_tcp_transport, _Config) ->
-    gen_fsm:start_link(?MODULE, Sock, []).
+start_link(SupPid, Processor, Sock) ->
+    {ok, proc_lib:spawn_link(?MODULE, init, [SupPid, Processor, Sock])}.
 
 %%
 %% Callbacks
 %%
 
--spec init(inet:socket()) -> {ok, accepting, #s{}}.
+-spec init(pid(), pid(), inet:socket()) -> ok.
 %% @hidden
-init(Sock) ->
-    process_flag(trap_exit, true),
-    {ok, accepting, #s{sock = Sock}}.
-
-%% @hidden
-handle_event(_Event, StateName, State) ->
-    {next_state, StateName, State}.
-
-%% @hidden
-handle_sync_event(_Event, _From, StateName, State) ->
-    {reply, ok, StateName, State}.
-
-%% @hidden
-handle_info({shoot, _Listener}, accepting, State) ->
-    {next_state, handshaking, State};
-handle_info(_Msg, StateName, State) ->
-    {next_state, StateName, State}.
-
-%% @hidden
-terminate(_Reason, _StateName, State) ->
-    close(State).
-
-%% @hidden
-code_change(_OldVsn, StateName, State, _Extra) ->
-    {ok, StateName, State}.
+init(SupPid, Processor, Sock) ->
+    recv(#s{sup = SupPid, processor = Processor, sock = Sock}).
 
 %%
 %% States
 %%
 
-%% Connecting
-%%
-%% A STOMP client initiates the stream or TCP connection to the server
-%% by sending the CONNECT frame:
+recv(State = #s{sock = Sock}) ->
+    case async_recv(Sock) of
+        {ok, Data} -> parse(Data, State);
+        stop       -> lager:info("Closing STOMP connection ~p", [self()])
+    end.
 
-%% CONNECT
-%% accept-version:1.1
-%% host:stomp.github.org
-%%
-%% ^@
-
-%% If the server accepts the connection attempt it will
-%% respond with a CONNECTED frame:
-
-%% CONNECTED
-%% version:1.1
-%%
-%% ^@
-
-%% The server can reject any connection attempt.
-%% The server SHOULD respond back with an ERROR frame listing
-%% why the connection was rejected and then close the connection.
-%% STOMP servers MUST support clients which rapidly connect and disconnect.
-%% This implies a server will likely only allow closed connections to
-%% linger for short time before the connection is reset.
-%% This means that a client may not receive the ERROR frame
-%% before the socket is reset.
-
-handshaking(_Event, State = #s{sock = Sock}) ->
-    ok = inet:setopts(Sock, [{active, once}]),
-    
-    {next_state, active, State}.
-
-active(_Event, State) ->
-    {next_state, active, State}.
+parse(Data, State = #s{processor = Processor, parser = Parser}) ->
+    case restomp:decode(Data, Parser) of
+        {more, NewParser} ->
+            recv(State#s{parser = NewParser});
+        {ok, Frame, Rest} ->
+            ok = harbinger_processor:process(Processor, Frame),
+            parse(Rest, #s{parser = restomp:new()})
+    end.
 
 %%
 %% Private
 %%
 
--spec send(inet:socket(), iolist()) -> ok.
+-spec async_recv(inet:socket()) -> {ok, binary()} | stop.
 %% @private
-send(Sock, Data) ->
-    case gen_tcp:send(Sock, Data) of
-        ok    -> ok;
-        Error -> lager:debug("CONN-CLOSED ~p - ~p", [Error, Data])
-    end.
+async_recv(Sock) -> async_recv(Sock, 0, infinity).
 
--spec close(#s{}) -> ok.
+-spec async_recv(inet:socket(), integer(), pos_integer() | infinity)
+                -> {ok, binary()} | stop.
 %% @private
-close(#s{sock = Sock}) ->
-    ok = send(Sock, <<"ERROR">>),
-    gen_tcp:close(Sock).
+async_recv(Sock, Length, Timeout) ->
+    ok = prim_inet:async_recv(Sock, Length, Timeout),
+    receive
+        {inet_async, Sock, _Ref, {ok, Data}} ->
+            {ok, Data};
+        {inet_async, _Sock, _Ref, {error, closed}} ->
+            stop;
+        {inet_async, _Sock, _Ref, {error, Reason}} ->
+            error({connection_error, Reason})
+    end.

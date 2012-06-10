@@ -8,11 +8,11 @@
 %% @doc
 %%
 
--module(railgun_topic_vnode).
+-module(harbinger_topic_vnode).
 
 -behaviour(riak_core_vnode).
 
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% API
 -export([start_vnode/1]).

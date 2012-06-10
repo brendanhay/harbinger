@@ -8,9 +8,9 @@
 %% @doc
 %%
 
--module(railgun_listener).
+-module(harbinger_listener).
 
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% API
 -export([start_link/1]).
@@ -25,7 +25,7 @@ start_link(Port) ->
     case cowboy:start_listener(
            tcp_listener, 100,
            cowboy_tcp_transport, [{port, Port}],
-           railgun_connection_sup, []) of
+           harbinger_connection_sup, []) of
         {ok, Pid} ->
             lager:info("Listening on 0.0.0.0:~p", [Port]),
             {ok, Pid};

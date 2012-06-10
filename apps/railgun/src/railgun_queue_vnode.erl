@@ -8,11 +8,11 @@
 %% @doc
 %%
 
--module(railgun_queue_vnode).
+-module(harbinger_queue_vnode).
 
 -behaviour(riak_core_vnode).
 
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% API
 -export([enqueue/5]).
@@ -37,7 +37,7 @@
 %% Macros
 %%
 
--define(MASTER, railgun_queue_vnode_master).
+-define(MASTER, harbinger_queue_vnode_master).
 
 %%
 %% Types
@@ -51,8 +51,8 @@
 
 enqueue(PrefList, ReqId, Topic, Queue, Msg) ->
     Cmd = {enqueue, ReqId, Topic, Queue, Msg},
-    lager:info("Enqueue: ~p", [Cmd]),
-    riak_core_vnode_master:command(PrefList, Cmd, ?MASTER).
+    lager:info("Enqueue: ~p on ~p", [Cmd, PrefList]),
+    riak_core_vnode_master:command(PrefList, Cmd, harbinger_queue_vnode_master).
 
 %%
 %% Callbacks

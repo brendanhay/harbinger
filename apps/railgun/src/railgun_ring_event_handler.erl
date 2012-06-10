@@ -8,11 +8,11 @@
 %% @doc
 %%
 
--module(railgun_ring_event_handler).
+-module(harbinger_ring_event_handler).
 
 -behaviour(gen_event).
 
--include("railgun.hrl").
+-include("harbinger.hrl").
 
 %% Callbacks
 -export([init/1,
