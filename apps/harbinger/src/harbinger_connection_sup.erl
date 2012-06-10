@@ -33,10 +33,10 @@ start_link(_Listener, Sock, cowboy_tcp_transport, []) ->
     %%
     %% The *processor* however is intrinsic, so when it exits, the
     %% supervisor2 goes too.
-    {ok, SupPid}        = supervisor2:start_link(?MODULE, []),
-    {ok, ProcessorPid}  = start_processor(SupPid, Sock),
-    {ok, ConnectionPid} = start_connection(SupPid, ProcessorPid, Sock),
-    %% ok                  = gen_tcp:controlling_process(Sock, ConnectionPid),
+    {ok, SupPid}       = supervisor2:start_link(?MODULE, []),
+    {ok, ProcessorPid} = start_processor(SupPid, Sock),
+    {ok, _ConnPid}     = start_connection(SupPid, ProcessorPid, Sock),
+    %% ok              = gen_tcp:controlling_process(Sock, ConnectionPid),
     {ok, SupPid}.
 
 %%
