@@ -13,7 +13,7 @@
 -behaviour(supervisor2).
 
 %% API
--export([start_link/4]).
+-export([start_link/1]).
 
 %% Callbacks
 -export([init/1]).
@@ -22,10 +22,9 @@
 %% API
 %%
 
--spec start_link(pid(), inet:socket(), cowboy_tcp_transport, []) ->
-                        {ok, pid()} | ignore | {error, _}.
+-spec start_link(inet:socket()) -> {ok, pid()} | ignore | {error, _}.
 %% @doc
-start_link(_Listener, Sock, cowboy_tcp_transport, []) ->
+start_link(Sock) ->
     %% We want the connection to be transient since when it exits normally
     %% the processor may have some work still to do (and the connection
     %% tells the processor to exit). However, if the connection terminates
@@ -33,10 +32,9 @@ start_link(_Listener, Sock, cowboy_tcp_transport, []) ->
     %%
     %% The *processor* however is intrinsic, so when it exits, the
     %% supervisor2 goes too.
-    {ok, SupPid}       = supervisor2:start_link(?MODULE, []),
-    {ok, ProcessorPid} = start_processor(SupPid, Sock),
-    {ok, _ConnPid}     = start_connection(SupPid, ProcessorPid, Sock),
-    %% ok              = gen_tcp:controlling_process(Sock, ConnectionPid),
+    {ok, SupPid}   = supervisor2:start_link(?MODULE, []),
+    {ok, ProcPid}  = start_processor(SupPid, Sock),
+    {ok, _ConnPid} = start_connection(SupPid, ProcPid, Sock),
     {ok, SupPid}.
 
 %%
@@ -61,8 +59,10 @@ start_processor(SupPid, Sock) ->
 
 -spec start_connection(pid(), pid(), inet:socket()) -> {ok, pid()}.
 %% @private
-start_connection(SupPid, ProcessorPid, Sock) ->
+start_connection(SupPid, ProcPid, Sock) ->
     Spec = {harbinger_connection,
-            {harbinger_connection, start_link, [SupPid, ProcessorPid, Sock]},
+            {harbinger_connection, start_link, [SupPid, ProcPid, Sock]},
             transient, 2000, worker, [harbinger_connection]},
-    supervisor2:start_child(SupPid, Spec).
+    Res = {ok, ConnPid} = supervisor2:start_child(SupPid, Spec),
+    ok = harbinger_connection:transfer_socket(ConnPid, Sock),
+    Res.

@@ -12,7 +12,7 @@
 
 -behaviour(gen_server).
 
--include_lib("restomp/include/restomp.hrl").
+-include("restomp.hrl").
 -include("harbinger.hrl").
 
 %% API
@@ -59,7 +59,13 @@ init({SupPid, Sock}) ->
 
 -spec handle_call(_, {pid(), _}, #s{}) -> {reply, ok, #s{}}.
 %% @hidden
-handle_call(_Msg, _From, State) -> {reply, ok, State}.
+%% handle_call(_Msg, _From, State) -> {reply, ok, State}.
+
+handle_call(Frame, _, State)
+  when Frame#stomp_frame.command =:= "STOMP"
+       orelse Frame#stomp_frame.command =:= "CONNECT" ->
+    lager:info("Processing Sync CONNECT"),
+    {reply, ok, connect(Frame, State)}.
 
 -spec handle_cast(stop | _, #s{}) -> {stop, normal, #s{}}.
 %% @hidden
@@ -68,6 +74,7 @@ handle_cast(stop, State) -> {stop, normal, State};
 handle_cast(Frame, State)
   when Frame#stomp_frame.command =:= "STOMP"
        orelse Frame#stomp_frame.command =:= "CONNECT" ->
+    lager:info("Processing CONNECT"),
     {noreply, connect(Frame, State)}.
 
 -spec handle_info(_, #s{}) -> {noreply, #s{}}.
@@ -111,9 +118,9 @@ send_frame(Command, Headers, Body, State) ->
 
 -spec send(inet:socket(), restomp:frame()) -> ok.
 %% @private
-send(Sock, Frame) ->
+send(Frame, #s{sock = Sock}) ->
     Data = restomp:encode(Frame),
     case gen_tcp:send(Sock, Data) of
-        ok    -> ok;
+        ok    -> lager:info("Sending Frame");
         Error -> lager:debug("CONN-CLOSED ~p - ~p", [Error, Data])
     end.

@@ -7,9 +7,10 @@
       stdlib,
       sasl,
       lager,
-      cowboy,
       riak_core
   ]},
   {mod, {harbinger, []}},
-  {env, []}
+  {env, [
+
+  ]}
 ]}.

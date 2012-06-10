@@ -34,8 +34,8 @@ start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 %% @hidden
 init(_Args) ->
     {ok, Port} = application:get_env(harbinger, stomp_port),
-    TcpListener = {harbinger_listener,
-                   {harbinger_listener, start_link, [Port]},
+    TcpListener = {harbinger_tcp_listener,
+                   {harbinger_tcp_listener, start_link, ["0.0.0.0", Port]},
                    permanent, 5000, worker, [harbinger_listener]},
     TopicMaster = {harbinger_topic_vnode_master,
                    {riak_core_vnode_master, start_link, [harbinger_topic_vnode]},
