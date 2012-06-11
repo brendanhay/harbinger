@@ -36,8 +36,7 @@
             sock     :: inet:socket(),
             session  :: string()}).
 
--define(VERSIONS,       ["1.0", "1.1"]).
--define(VERSION_HEADER, {"version", string:join(?VERSIONS, ",")}).
+-define(VERSION_HEADER, {"version", "1.0,1.1"}).
 -define(SERVER_HEADER,  {"server", "Harbinger/0.1.0"}).
 -define(CONTENT_TEXT,   {"content-type", "text/plain"}).
 
