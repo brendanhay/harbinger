@@ -75,10 +75,12 @@ handle_call(Msg, _From, State) -> {stop, {unhandled_call, Msg}, State}.
 %% @hidden
 handle_cast(stop, State) ->
     {stop, normal, State};
-handle_cast(Frame = #stomp_frame{}, State) ->
-    case handle_frame(Frame, State) of
-        {ok, NewState}           -> {noreply, NewState};
-        {error, Error, NewState} -> {stop, Error, NewState}
+handle_cast(Frame = #stomp_frame{command = Cmd}, State) ->
+    case Cmd of
+        "STOMP"      -> connect(Frame, State);
+        "CONNECT"    -> connect(Frame, State);
+        "DISCONNECT" -> disconnect(Frame, State);
+        _Unknown     -> unsupported(Frame, State)
     end;
 handle_cast(Msg, State) ->
     {stop, {unhandled_cast, Msg}, State}.
@@ -96,20 +98,8 @@ terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %%
-%% Private
+%% Frame Handlers
 %%
-
--spec handle_frame(#stomp_frame{}, #s{}) -> {ok | stop, #s{}}.
-%% @private
-handle_frame(Frame = #stomp_frame{command = Cmd}, State) ->
-    case Cmd of
-        "STOMP"   -> connect(Frame, State);
-        "CONNECT" -> connect(Frame, State);
-        Unknown   -> send_error(unknown_command,
-                                "Command '~p' is not recognized.~n",
-                                [Unknown],
-                                State)
-    end.
 
 %% @private
 connect(#stomp_frame{}, State = #s{session = undefined}) ->
@@ -124,6 +114,20 @@ connect(#stomp_frame{command = Cmd}, State = #s{session = Session}) ->
                [Cmd, Session],
                State).
 
+%% @disconnect
+disconnect(_Frame, State) -> {stop, normal, State}.
+
+%% @private
+unsupported(#stomp_frame{command = Cmd}, State) ->
+    send_error(unsupported_command,
+               "Command '~p' not supported.~n",
+               [Cmd],
+               State).
+
+%%
+%% Socket Communication
+%%
+
 %% @private
 send_error(Message, Format, Args, State) ->
     send_error(Message, lists:flatten(io_lib:format(Format, Args)), State).
@@ -134,8 +138,8 @@ send_error(Message, Detail, State) ->
                ?CONTENT_TEXT,
                ?VERSION_HEADER],
     case send_frame("ERROR", Headers, Detail, State) of
-        {ok, NewState} -> {error, Message, NewState};
-        Error          -> Error
+        {noreply, NewState} -> {stop, Message, NewState};
+        Error               -> Error
     end.
 
 %% @private
@@ -146,6 +150,6 @@ send_frame(Command, Headers, Body, State) ->
 %% @private
 send(Frame, State = #s{sock = Sock}) ->
     case gen_tcp:send(Sock, restomp:encode(Frame)) of
-        ok    -> {ok, State};
-        Error -> {error, Error, State}
+        ok    -> {noreply, State};
+        Error -> {stop, Error, State}
     end.
