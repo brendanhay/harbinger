@@ -56,7 +56,7 @@ handoff_socket(Pid, Sock) ->
 init(SupPid, ProcPid, Sock) ->
     receive
         {accepted, Sock} ->
-            lager:info("Accepted"),
+            lager:info("Accepted STOMP connection ~p", [self()]),
             recv(#s{sup = SupPid, processor = ProcPid, sock = Sock})
     after
         ?TIMEOUT ->
