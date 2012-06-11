@@ -36,8 +36,8 @@
             sock     :: inet:socket(),
             session  :: string()}).
 
--define(VERSION_HEADER, {"version", "1.0,1.1"}).
--define(SERVER_HEADER,  {"server", "Harbinger/0.1.0"}).
+-define(HEADER_VERSION, {"version", "1.1,1.0"}).
+-define(HEADER_SERVER,  {"server", "Harbinger/0.1.0"}).
 -define(CONTENT_TEXT,   {"content-type", "text/plain"}).
 
 %%
@@ -115,8 +115,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 connect(_Frame, State) ->
     Session = riak_core_util:unique_id_62(),
     Headers = [{"session", Session},
-               ?SERVER_HEADER,
-               ?VERSION_HEADER],
+               ?HEADER_SERVER,
+               ?HEADER_VERSION],
     send_frame("CONNECTED", Headers, "", State#s{session = Session}).
 
 %% @private
@@ -219,7 +219,7 @@ send_error(Msg, State) -> send_error(Msg, [], State).
 send_error(Msg, Body, State) ->
     Headers = [{"message", atom_to_list(Msg)},
                ?CONTENT_TEXT,
-               ?VERSION_HEADER],
+               ?HEADER_VERSION],
     case send_frame("ERROR", Headers, [Body], State) of
         {noreply, NewState} -> {stop, Msg, NewState};
         Error               -> Error
