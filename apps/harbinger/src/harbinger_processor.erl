@@ -73,8 +73,6 @@ handle_call(Msg, _From, State) -> {stop, {unhandled_call, Msg}, State}.
 
 -spec handle_cast(stop | _, #s{}) -> {stop, normal, #s{}}.
 %% @hidden
-handle_cast(stop, State) ->
-    {stop, normal, State};
 handle_cast(Frame = #stomp_frame{command = Cmd}, State) ->
     case Cmd of
         "STOMP"       -> connect(Frame, State);
@@ -84,9 +82,14 @@ handle_cast(Frame = #stomp_frame{command = Cmd}, State) ->
         "UNSUBSCRIBE" -> unsubscribe(Frame, State);
         "ACK"         -> ack(Frame, State);
         "NACK"        -> nack(Frame, State);
-        "DISCONNECT"  -> disconnect(Frame, State);
-        _Unknown      -> unsupported(Frame, State)
+        "BEGIN"       -> txbegin(State);
+        "COMMIT"      -> txcommit(State);
+        "ABORT"       -> txabort(State);
+        "DISCONNECT"  -> disconnect(State);
+        _Unknown      -> unsupported(State)
     end;
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(Msg, State) ->
     {stop, {unhandled_cast, Msg}, State}.
 
@@ -107,17 +110,14 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%
 
 %% @private
-connect(#stomp_frame{}, State = #s{session = undefined}) ->
+connect(_Frame, State = #s{session = undefined}) ->
     Session = riak_core_util:unique_id_62(),
     Headers = [{"session", Session},
                ?SERVER_HEADER,
                ?VERSION_HEADER],
     send_frame("CONNECTED", Headers, "", State#s{session = Session});
-connect(#stomp_frame{command = Cmd}, State = #s{session = Session}) ->
-    send_error(already_connected,
-               "Issued '~s' command when '~s' already connected.~n",
-               [Cmd, Session],
-               State).
+connect(_Frame, State) ->
+    send_error(already_connected, State).
 
 %% @private
 send(Frame = #stomp_frame{command = _Cmd, headers = _Headers, body = _Body},
@@ -126,42 +126,57 @@ send(Frame = #stomp_frame{command = _Cmd, headers = _Headers, body = _Body},
     case restomp:header(Frame, "destination") of
         {ok, Dest} ->
             case split_destination(Dest) of
-                {topic, _Topic} ->
-                    {noreply, State};
-                _Other ->
-                    send_error(invalid_destination,
-                               "Invalid 'destination' ~s. Expected format: '/topic'~n",
-                               [Dest],
-                               State)
+                {topic, _Topic}  -> {noreply, State};
+                _Other           -> send_error(invalid_destination, State)
             end;
         not_found ->
-            send_error(no_destination,
-                       "A 'destination' header must be specified.~n",
-                       [],
-                       State)
+            send_error(no_destination, State)
     end.
 
 %% @private
-subscribe(_Frame, _State) -> ok.
+subscribe(Frame, State) ->
+    Fun = fun(H) -> restomp:header(Frame, H) end,
+    case {Fun("ack"), Fun("id"), Fun("destination")} of
+        {{ok, "client"}, {ok, _Id}, {ok, Dest}} ->
+            case split_destination(Dest) of
+                {queue, _Topic, _Queue} -> {noreply, State};
+                _Other                  -> send_error(invalid_destination, State)
+            end;
+        {_Ack, not_found, _Dest} ->
+            send_error(no_id, State);
+        {_Ack, _Id, _Dest} ->
+            send_error(must_set_ack_client, State)
+    end.
 
 %% @private
-unsubscribe(_Frame, _State) -> ok.
+unsubscribe(Frame, State) ->
+    case restomp:header(Frame, "id") of
+        {ok, _Id} ->
+            {noreply, State};
+        not_found ->
+            send_error(no_id, State)
+    end.
 
 %% @private
-ack(_Frame, _State) -> ok.
+ack(_Frame, State) -> send_error(not_implemented, State).
 
 %% @private
-nack(_Frame, _State) -> ok.
+nack(_Frame, State) -> send_error(not_implemented, State).
 
 %% @private
-disconnect(_Frame, State) -> {stop, normal, State}.
+txbegin(State) -> send_error(not_implemented, State).
 
 %% @private
-unsupported(#stomp_frame{command = Cmd}, State) ->
-    send_error(unsupported_command,
-               "Command '~p' not supported.~n",
-               [Cmd],
-               State).
+txcommit(State) -> send_error(not_implemented, State).
+
+%% @private
+txabort(State) -> send_error(not_implemented, State).
+
+%% @private
+disconnect(State) -> {stop, normal, State}.
+
+%% @private
+unsupported(State) -> send_error(unsupported_command, State).
 
 %%
 %% Validation
@@ -183,15 +198,11 @@ split_destination(Dest) ->
 %%
 
 %% @private
-send_error(Message, Format, Args, State) ->
-    send_error(Message, lists:flatten(io_lib:format(Format, Args)), State).
-
-%% @private
-send_error(Message, Detail, State) ->
+send_error(Message, State) ->
     Headers = [{"message", atom_to_list(Message)},
                ?CONTENT_TEXT,
                ?VERSION_HEADER],
-    case send_frame("ERROR", Headers, Detail, State) of
+    case send_frame("ERROR", Headers, [], State) of
         {noreply, NewState} -> {stop, Message, NewState};
         Error               -> Error
     end.
