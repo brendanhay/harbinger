@@ -132,17 +132,16 @@ send(Frame = #stomp_frame{command = _Cmd, headers = _Headers, body = _Body},
 
 %% @private
 subscribe(Frame, State) ->
-    Fun = fun(H) -> restomp:header(Frame, H) end,
-    case {Fun("ack"), Fun("id"), Fun("destination")} of
-        {{ok, "client"}, {ok, _Id}, {ok, Dest}} ->
+    case ensure_headers(["ack", "id", "destination"], Frame) of
+        {ok, ["client", _Id, Dest]} ->
             case split_destination(Dest) of
                 {queue, _Topic, _Queue} -> {noreply, State};
                 _Other                  -> send_error(invalid_destination, State)
             end;
-        {_Ack, not_found, _Dest} ->
-            send_error(no_id, State);
-        {_Ack, _Id, _Dest} ->
-            send_error(must_set_ack_client, State)
+        {ok, [_Ack, _Id, _Dest]} ->
+            send_error(must_set_ack_client, State);
+        {error, Msg, Detail} ->
+            send_error(Msg, Detail, State)
     end.
 
 %% @private
@@ -156,26 +155,20 @@ unsubscribe(Frame, State) ->
 
 %% @private
 ack(Frame, State) ->
-    Fun = fun(H) -> restomp:header(Frame, H) end,
-    case {Fun("message-id"), Fun("subscription")} of
-        {{ok, _Id}, {ok, _Sub}} ->
+    case ensure_headers(["message-id", "subscription"], Frame) of
+        {ok, [_Id, _Sub]} ->
             {noreply, State};
-        {not_found, _Sub} ->
-            send_error(no_message_id, State);
-        {_Id, not_found} ->
-            send_error(no_subscription, State)
+        {error, Msg, Detail} ->
+            send_error(Msg, Detail, State)
     end.
 
 %% @private
 nack(Frame, State) ->
-    Fun = fun(H) -> restomp:header(Frame, H) end,
-    case {Fun("message-id"), Fun("subscription")} of
-        {{ok, _Id}, {ok, _Sub}} ->
+    case ensure_headers(["message-id", "subscription"], Frame) of
+        {ok, [_Id, _Sub]} ->
             {noreply, State};
-        {not_found, _Sub} ->
-            send_error(no_message_id, State);
-        {_Id, not_found} ->
-            send_error(no_subscription, State)
+        {error, Msg, Detail} ->
+            send_error(Msg, Detail, State)
     end.
 
 %% @private
@@ -187,6 +180,18 @@ unsupported(State) -> send_error(unsupported_command, State).
 %%
 %% Validation
 %%
+
+%% @private
+ensure_headers(Headers, Frame) -> ensure_headers(Headers, Frame, []).
+
+%% @private
+ensure_headers([], _Frame, Acc) ->
+    {ok, lists:reverse(Acc)};
+ensure_headers([H|T], Frame, Acc) ->
+    case restomp:header(Frame, H) of
+        {ok, Value} -> ensure_headers(T, Frame, [Value|Acc]);
+        not_found   -> {error, missing_header, "Missing header: " ++ H}
+    end.
 
 %% @private
 split_destination(Dest) ->
@@ -204,18 +209,21 @@ split_destination(Dest) ->
 %%
 
 %% @private
-send_error(Message, State) ->
-    Headers = [{"message", atom_to_list(Message)},
+send_error(Msg, State) -> send_error(Msg, [], State).
+
+%% @private
+send_error(Msg, Details, State) ->
+    Headers = [{"message", atom_to_list(Msg)},
                ?CONTENT_TEXT,
                ?VERSION_HEADER],
-    case send_frame("ERROR", Headers, [], State) of
-        {noreply, NewState} -> {stop, Message, NewState};
+    case send_frame("ERROR", Headers, Details, State) of
+        {noreply, NewState} -> {stop, Msg, NewState};
         Error               -> Error
     end.
 
 %% @private
-send_frame(Command, Headers, Body, State) ->
-    send_frame(#stomp_frame{command = Command, headers = Headers, body = Body}, State).
+send_frame(Cmd, Headers, Body, State) ->
+    send_frame(#stomp_frame{command = Cmd, headers = Headers, body = Body}, State).
 
 -spec send_frame(restomp:frame(), inet:socket()) -> #s{}.
 %% @private
