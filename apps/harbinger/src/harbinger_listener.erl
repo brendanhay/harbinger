@@ -5,10 +5,10 @@
 %%
 %% @author Brendan Hay
 %% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
-%% @doc Used by the `harbinger-admin` script
+%% @doc
 %%
 
--module(harbinger_tcp_listener).
+-module(harbinger_listener).
 
 -behaviour(gen_nb_server).
 
@@ -27,27 +27,52 @@
          new_connection/2]).
 
 %%
+%% Types
+%%
+
+-record(s, {}).
+
+%%
 %% API
 %%
 
+-spec start_link(string(), inet:port_number())
+                -> {ok, pid()} | ignore | {error, _}.
+%% @doc
 start_link(IpAddr, Port) -> gen_nb_server:start_link(?MODULE, IpAddr, Port, []).
 
 %%
 %% Callbacks
 %%
 
-init([]) -> {ok, []}.
+-spec init([]) -> {ok, #s{}}.
+%% @hidden
+init([]) -> {ok, #s{}}.
 
+-spec handle_call(_, {pid(), _}, #s{}) -> {stop, normal, #s{}}.
+%% @hidden
 handle_call(Msg, _From, State) -> {stop, {unhandled_call, Msg}, State}.
 
+-spec handle_cast(_, #s{}) -> {stop, normal, #s{}}.
+%% @hidden
 handle_cast(Msg, State) -> {stop, {unhandled_cast, Msg}, State}.
 
-handle_info(Msg, State) -> {stop, {unhandled_info, Msg}, State}.
+-spec handle_info(_, #s{}) -> {noreply, #s{}}.
+%% @hidden
+handle_info(_Info, State) -> {noreply, State}.
 
+-spec terminate(_, #s{}) -> ok.
+%% @hidden
 terminate(_Reason, _State) -> ok.
 
-sock_opts() -> [binary, {active, once}, {packet, 0}, {linger, {true, 1}}].
+-spec sock_opts() -> [gen_tcp:option()].
+%% @hidden
+sock_opts() ->
+    [binary, {active, once}, {packet, 0}, {linger, {false, 0}}].
 
+-spec new_connection(inet:socket(), #s{}) -> {ok, #s{}}.
+%% @hidden
 new_connection(Sock, State) ->
-    {ok, _SupPid} = harbinger_connection_sup:start_link(Sock),
+    {ok, _SupPid, ReaderPid} = harbinger_connection_sup:start_child(Sock),
+    ok = harbinger_reader:handoff_socket(ReaderPid, Sock),
     {ok, State}.

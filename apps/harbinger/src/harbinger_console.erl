@@ -66,7 +66,8 @@ remove_node(Node) when is_atom(Node) ->
             error
     end.
 
--spec(ringready([]) -> ok | error).
+-spec ringready([]) -> ok | error.
+%% @doc
 ringready([]) ->
     try riak_core_status:ringready() of
         {ok, Nodes} ->

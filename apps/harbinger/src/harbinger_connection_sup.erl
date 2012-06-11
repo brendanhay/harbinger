@@ -5,15 +5,16 @@
 %%
 %% @author Brendan Hay
 %% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
-%% @doc Used by the `harbinger-admin` script
+%% @doc
 %%
 
 -module(harbinger_connection_sup).
 
--behaviour(supervisor2).
+-behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0,
+         start_child/1]).
 
 %% Callbacks
 -export([init/1]).
@@ -22,47 +23,22 @@
 %% API
 %%
 
--spec start_link(inet:socket()) -> {ok, pid()} | ignore | {error, _}.
+-spec start_link() -> {ok, pid()} | ignore | {error, _}.
 %% @doc
-start_link(Sock) ->
-    %% We want the connection to be transient since when it exits normally
-    %% the processor may have some work still to do (and the connection
-    %% tells the processor to exit). However, if the connection terminates
-    %% abnormally then we want to take everything down.
-    %%
-    %% The *processor* however is intrinsic, so when it exits, the
-    %% supervisor2 goes too.
-    {ok, SupPid}   = supervisor2:start_link(?MODULE, []),
-    {ok, ProcPid}  = start_processor(SupPid, Sock),
-    {ok, _ConnPid} = start_connection(SupPid, ProcPid, Sock),
-    {ok, SupPid}.
+start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+-spec start_child(inet:socket()) -> {ok, pid(), pid()}.
+%% @doc
+start_child(Sock) -> supervisor:start_child(?MODULE, [Sock]).
 
 %%
 %% Callbacks
 %%
 
--spec init([]) -> {ok, {{one_for_all, 0, 1}, [supervisor2:child_spec()]}}.
+-spec init([]) -> {ok, {{simple_one_for_one, 0, 1}, [supervisor:child_spec()]}}.
 %% @hidden
-init([]) -> {ok, {{one_for_all, 0, 1}, []}}.
-
-%%
-%% Private
-%%
-
--spec start_processor(pid(), inet:socket()) -> {ok, pid()}.
-%% @private
-start_processor(SupPid, Sock) ->
-    Spec = {harbinger_processor,
-            {harbinger_processor, start_link, [SupPid, Sock]},
-            intrinsic, 5000, worker, [harbinger_processor]},
-    supervisor2:start_child(SupPid, Spec).
-
--spec start_connection(pid(), pid(), inet:socket()) -> {ok, pid()}.
-%% @private
-start_connection(SupPid, ProcPid, Sock) ->
-    Spec = {harbinger_connection,
-            {harbinger_connection, start_link, [SupPid, ProcPid, Sock]},
-            transient, 2000, worker, [harbinger_connection]},
-    Res = {ok, ConnPid} = supervisor2:start_child(SupPid, Spec),
-    ok = harbinger_connection:transfer_socket(ConnPid, Sock),
-    Res.
+init([]) ->
+    Spec = {connection,
+            {harbinger_connection, start_link, []},
+            temporary, 1000, supervisor, [harbinger_connection]},
+    {ok, {{simple_one_for_one, 0, 1}, [Spec]}}.

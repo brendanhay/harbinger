@@ -37,7 +37,11 @@ docs:
 #
 
 console: build
-	exec erl -pa apps/*/ebin $(DEPS) -sname harbinger -boot start_sasl
+	exec erl \
+	-pa apps/*/ebin $(DEPS) \
+	-sname harbinger \
+	-boot start_sasl \
+	-s harbinger
 
 devclean:
 	$(foreach d, $(wildcard dev/dev*), $(d)/bin/harbinger stop;)
