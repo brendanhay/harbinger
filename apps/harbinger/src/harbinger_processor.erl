@@ -82,9 +82,6 @@ handle_cast(Frame = #stomp_frame{command = Cmd}, State) ->
         "UNSUBSCRIBE" -> unsubscribe(Frame, State);
         "ACK"         -> ack(Frame, State);
         "NACK"        -> nack(Frame, State);
-        "BEGIN"       -> txbegin(State);
-        "COMMIT"      -> txcommit(State);
-        "ABORT"       -> txabort(State);
         "DISCONNECT"  -> disconnect(State);
         _Unknown      -> unsupported(State)
     end;
@@ -158,19 +155,28 @@ unsubscribe(Frame, State) ->
     end.
 
 %% @private
-ack(_Frame, State) -> send_error(not_implemented, State).
+ack(Frame, State) ->
+    Fun = fun(H) -> restomp:header(Frame, H) end,
+    case {Fun("message-id"), Fun("subscription")} of
+        {{ok, _Id}, {ok, _Sub}} ->
+            {noreply, State};
+        {not_found, _Sub} ->
+            send_error(no_message_id, State);
+        {_Id, not_found} ->
+            send_error(no_subscription, State)
+    end.
 
 %% @private
-nack(_Frame, State) -> send_error(not_implemented, State).
-
-%% @private
-txbegin(State) -> send_error(not_implemented, State).
-
-%% @private
-txcommit(State) -> send_error(not_implemented, State).
-
-%% @private
-txabort(State) -> send_error(not_implemented, State).
+nack(Frame, State) ->
+    Fun = fun(H) -> restomp:header(Frame, H) end,
+    case {Fun("message-id"), Fun("subscription")} of
+        {{ok, _Id}, {ok, _Sub}} ->
+            {noreply, State};
+        {not_found, _Sub} ->
+            send_error(no_message_id, State);
+        {_Id, not_found} ->
+            send_error(no_subscription, State)
+    end.
 
 %% @private
 disconnect(State) -> {stop, normal, State}.
