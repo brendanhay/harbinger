@@ -49,11 +49,11 @@ start_link(IpAddr, Port) -> gen_nb_server:start_link(?MODULE, IpAddr, Port, []).
 %% @hidden
 init([]) -> {ok, #s{}}.
 
--spec handle_call(_, {pid(), _}, #s{}) -> {stop, normal, #s{}}.
+-spec handle_call(_, {pid(), _}, #s{}) -> {stop, {unhandled_call, _}, #s{}}.
 %% @hidden
 handle_call(Msg, _From, State) -> {stop, {unhandled_call, Msg}, State}.
 
--spec handle_cast(_, #s{}) -> {stop, normal, #s{}}.
+-spec handle_cast(_, #s{}) -> {stop, {unhandled_cast, _}, #s{}}.
 %% @hidden
 handle_cast(Msg, State) -> {stop, {unhandled_cast, Msg}, State}.
 
@@ -67,8 +67,7 @@ terminate(_Reason, _State) -> ok.
 
 -spec sock_opts() -> [gen_tcp:option()].
 %% @hidden
-sock_opts() ->
-    [binary, {active, once}, {packet, 0}, {linger, {false, 0}}].
+sock_opts() -> [binary, {active, once}, {packet, 0}, {linger, {false, 0}}].
 
 -spec new_connection(inet:socket(), #s{}) -> {ok, #s{}}.
 %% @hidden

@@ -134,13 +134,13 @@ parse_command(<<>>, Acc) ->
     more(fun(Rest) -> parse_command(Rest, Acc) end);
 parse_command(<<$\n, Rest/binary>>, []) ->  % inter-frame newline
     parse_command(Rest, []);
-parse_command(<<$\r, Rest/binary>>, []) ->  % inter-frame newline
+parse_command(<<$\r, $\n, Rest/binary>>, []) ->  % inter-frame newline
     parse_command(Rest, []);
 parse_command(<<0, Rest/binary>>, []) ->    % empty frame
     parse_command(Rest, []);
 parse_command(<<$\n, Rest/binary>>, Acc) -> % end command
     parse_headers(Rest, lists:reverse(Acc));
-parse_command(<<$\r, Rest/binary>>, Acc) -> % end command
+parse_command(<<$\r, $\n, Rest/binary>>, Acc) -> % end command
     parse_headers(Rest, lists:reverse(Acc));
 parse_command(<<Ch:8, Rest/binary>>, Acc) ->
     parse_command(Rest, [Ch|Acc]).
@@ -152,12 +152,12 @@ parse_headers(<<>>, Frame, HeaderAcc, KeyAcc) ->
     more(fun(Rest) -> parse_headers(Rest, Frame, HeaderAcc, KeyAcc) end);
 parse_headers(<<$\n, Rest/binary>>, Frame, HeaderAcc, _KeyAcc) -> % end headers
     parse_body(Rest, Frame#stomp_frame{headers = HeaderAcc});
-parse_headers(<<$\r, Rest/binary>>, Frame, HeaderAcc, _KeyAcc) -> % end headers
+parse_headers(<<$\r, $\n, Rest/binary>>, Frame, HeaderAcc, _KeyAcc) -> % end headers
     parse_body(Rest, Frame#stomp_frame{headers = HeaderAcc});
 parse_headers(<<$:, Rest/binary>>, Frame, HeaderAcc, KeyAcc) ->   % end key
     parse_header_value(Rest, Frame, HeaderAcc, lists:reverse(KeyAcc));
 parse_headers(<<Ch:8, Rest/binary>>, Frame, HeaderAcc, KeyAcc) ->
-    parse_headers(Rest, Frame, HeaderAcc, [Ch | KeyAcc]).
+    parse_headers(Rest, Frame, HeaderAcc, [Ch|KeyAcc]).
 
 parse_header_value(Rest, Frame, HeaderAcc, Key) -> % begin header value
     parse_header_value(Rest, Frame, HeaderAcc, Key, []).
@@ -169,7 +169,7 @@ parse_header_value(<<$\n, Rest/binary>>, Frame, HeaderAcc, Key, ValAcc) -> % end
     parse_headers(Rest, Frame,
                   insert_header(HeaderAcc, Key, lists:reverse(ValAcc)),
                   []);
-parse_header_value(<<$\r, Rest/binary>>, Frame, HeaderAcc, Key, ValAcc) -> % end value
+parse_header_value(<<$\r, $\n, Rest/binary>>, Frame, HeaderAcc, Key, ValAcc) -> % end value
     parse_headers(Rest, Frame,
                   insert_header(HeaderAcc, Key, lists:reverse(ValAcc)),
                   []);

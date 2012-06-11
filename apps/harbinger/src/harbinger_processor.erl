@@ -32,9 +32,9 @@
 %% Types
 %%
 
--record(s, {sup     :: pid(),
-            sock    :: inet:socket(),
-            session :: string()}).
+-record(s, {sup      :: pid(),
+            sock     :: inet:socket(),
+            session  :: string()}).
 
 -define(VERSIONS,       ["1.0", "1.1"]).
 -define(VERSION_HEADER, {"version", string:join(?VERSIONS, ",")}).
@@ -77,10 +77,15 @@ handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(Frame = #stomp_frame{command = Cmd}, State) ->
     case Cmd of
-        "STOMP"      -> connect(Frame, State);
-        "CONNECT"    -> connect(Frame, State);
-        "DISCONNECT" -> disconnect(Frame, State);
-        _Unknown     -> unsupported(Frame, State)
+        "STOMP"       -> connect(Frame, State);
+        "CONNECT"     -> connect(Frame, State);
+        "SEND"        -> send(Frame, State);
+        "SUBSCRIBE"   -> subscribe(Frame, State);
+        "UNSUBSCRIBE" -> unsubscribe(Frame, State);
+        "ACK"         -> ack(Frame, State);
+        "NACK"        -> nack(Frame, State);
+        "DISCONNECT"  -> disconnect(Frame, State);
+        _Unknown      -> unsupported(Frame, State)
     end;
 handle_cast(Msg, State) ->
     {stop, {unhandled_cast, Msg}, State}.
@@ -98,7 +103,7 @@ terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %%
-%% Frame Handlers
+%% Handlers
 %%
 
 %% @private
@@ -114,7 +119,41 @@ connect(#stomp_frame{command = Cmd}, State = #s{session = Session}) ->
                [Cmd, Session],
                State).
 
-%% @disconnect
+%% @private
+send(Frame = #stomp_frame{command = _Cmd, headers = _Headers, body = _Body},
+     State) ->
+    %% Check destination header exists
+    case restomp:header(Frame, "destination") of
+        {ok, Dest} ->
+            case split_destination(Dest) of
+                {topic, _Topic} ->
+                    {noreply, State};
+                _Other ->
+                    send_error(invalid_destination,
+                               "Invalid 'destination' ~s. Expected format: '/topic'~n",
+                               [Dest],
+                               State)
+            end;
+        not_found ->
+            send_error(no_destination,
+                       "A 'destination' header must be specified.~n",
+                       [],
+                       State)
+    end.
+
+%% @private
+subscribe(_Frame, _State) -> ok.
+
+%% @private
+unsubscribe(_Frame, _State) -> ok.
+
+%% @private
+ack(_Frame, _State) -> ok.
+
+%% @private
+nack(_Frame, _State) -> ok.
+
+%% @private
 disconnect(_Frame, State) -> {stop, normal, State}.
 
 %% @private
@@ -125,7 +164,22 @@ unsupported(#stomp_frame{command = Cmd}, State) ->
                State).
 
 %%
-%% Socket Communication
+%% Validation
+%%
+
+%% @private
+split_destination(Dest) ->
+    case re:split(Dest, "/") of
+        [<<>>, <<>>, <<>>]     -> invalid;
+        [<<>>, _Topic, <<>>]   -> invalid;
+        [<<>>, Topic]          -> {topic, Topic};
+        [<<>>, Topic, Queue]
+          when size(Queue) > 0 -> {queue, Topic, Queue};
+        _Other                 -> invalid
+    end.
+
+%%
+%% Communication
 %%
 
 %% @private
@@ -144,11 +198,11 @@ send_error(Message, Detail, State) ->
 
 %% @private
 send_frame(Command, Headers, Body, State) ->
-    send(#stomp_frame{command = Command, headers = Headers, body = Body}, State).
+    send_frame(#stomp_frame{command = Command, headers = Headers, body = Body}, State).
 
--spec send(restomp:frame(), inet:socket()) -> #s{}.
+-spec send_frame(restomp:frame(), inet:socket()) -> #s{}.
 %% @private
-send(Frame, State = #s{sock = Sock}) ->
+send_frame(Frame, State = #s{sock = Sock}) ->
     case gen_tcp:send(Sock, restomp:encode(Frame)) of
         ok    -> {noreply, State};
         Error -> {stop, Error, State}
