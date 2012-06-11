@@ -106,7 +106,7 @@ handle_frame(Frame = #stomp_frame{command = Cmd}, State) ->
         "STOMP"   -> connect(Frame, State);
         "CONNECT" -> connect(Frame, State);
         Unknown   -> send_error(unknown_command,
-                                "Command '~p' is not recognized.",
+                                "Command '~p' is not recognized.~n",
                                 [Unknown],
                                 State)
     end.
@@ -120,7 +120,7 @@ connect(#stomp_frame{}, State = #s{session = undefined}) ->
     send_frame("CONNECTED", Headers, "", State#s{session = Session});
 connect(#stomp_frame{command = Cmd}, State = #s{session = Session}) ->
     send_error(already_connected,
-               "Issued '~s' command when '~s' already connected.",
+               "Issued '~s' command when '~s' already connected.~n",
                [Cmd, Session],
                State).
 
