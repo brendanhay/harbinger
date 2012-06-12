@@ -41,10 +41,11 @@
 %% Types
 %%
 
--record(s, {partition,
-            head = 0                   :: non_neg_integer(),
-            tail = 0                   :: non_neg_integer(),
-            bindings = gb_sets:empty() :: gb_set()}).
+-record(s, {partition = 0               :: non_neg_integer(),
+            head      = 0               :: non_neg_integer(),
+            tail      = 0               :: non_neg_integer(),
+            bindings  = gb_sets:empty() :: gb_set(),
+            log       = []              :: [binary()]}).
 
 -define(TIMEOUT, 5000).
 
@@ -54,10 +55,11 @@
 
 -spec publish(binary(), binary()) -> ok.
 %% @doc
-publish(_Topic, _Payload) ->
-    %% Write the payload to the topic and then the vnodes call
-    %% queue:handle_publish offset reply
-    ok.
+publish(Topic, Payload) ->
+    harbinger_coordinator:noreply({Topic, Topic},
+                               harbinger_topic,
+                               fun(R) -> {publish, R, Payload} end,
+                               ?TOPIC_MASTER).
 
 -spec bind(binary(), binary()) -> {ok, non_neg_integer(), non_neg_integer()}.
 %% @doc
@@ -75,6 +77,8 @@ unbind(Topic, Queue) ->
                                fun(R) -> {unbind, R, {queue, Queue}} end,
                                ?TOPIC_MASTER).
 
+-spec bindings(binary()) -> {ok, [{queue, binary()}]}.
+%% @doc
 bindings(Topic) ->
     harbinger_coordinator:reply({Topic, Topic},
                                 harbinger_topic,
@@ -89,14 +93,26 @@ start_vnode(Index) -> riak_core_vnode_master:get_vnode_pid(Index, ?MODULE).
 
 init([Partition]) -> {ok, #s{partition = Partition}}.
 
+%% Publish
+handle_command({publish, ReqId, Payload}, _Sender, State = #s{tail = Tail, log = Log}) ->
+    NewState = State#s{log = [Payload|Log], tail = Tail + 1},
+    {reply, {ok, ReqId}, NewState};
+
+%% Bind
 handle_command({bind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
     NewState = State#s{bindings = gb_sets:add(Binding, Bindings)},
     {reply, {ok, ReqId, {State#s.head, State#s.tail}}, NewState};
+
+%% Unbind
 handle_command({unbind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
     NewState = State#s{bindings = gb_sets:delete_any(Binding, Bindings)},
     {reply, {ok, ReqId}, NewState};
+
+%% Bindings
 handle_command({bindings, ReqId}, _Sender, State) ->
     {reply, {ok, ReqId, gb_sets:to_list(State#s.bindings)}, State};
+
+%% Ping
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#s.partition}, State}.
 
