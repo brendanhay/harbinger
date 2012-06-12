@@ -14,9 +14,13 @@
 
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 -include("riak_zab_vnode.hrl").
+-include("harbinger.hrl").
 
 %% API
--export([hash_key/1]).
+-export([hash_key/1,
+         subscribe/2,
+         unsubscribe/1,
+         handle_publish/2]).
 
 %% Callbacks
 -export([start_vnode/1,
@@ -43,6 +47,30 @@
 %%
 %% API
 %%
+
+%%
+%% API
+%%
+
+-spec subscribe(binary(), binary()) -> ok.
+%% @doc
+subscribe(_Topic, _Queue) ->
+    %% {ok, NewestOffset, OldestOffset} = harbinger_topic:bind(Topic, Queue),
+    %% Notify ensemble of new connection/subscription
+    ok.
+
+-spec unsubscribe(binary()) -> ok.
+%% @doc
+unsubscribe(_Queue) ->
+    %% ok = harbinger_topic:unbind(Topic, Queue),
+    %% Now what, crash all the connected connections?
+    ok.
+
+-spec handle_publish(binary(), pos_integer()) -> ok.
+%% @doc
+handle_publish(_Queue, _NewestOffset) ->
+    %% Notify the ensemble of the updated offset
+    ok.
 
 hash_key(Key) -> chash:key_of(Key).
 

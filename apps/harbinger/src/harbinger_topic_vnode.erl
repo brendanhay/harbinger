@@ -12,10 +12,14 @@
 
 -behaviour(riak_core_vnode).
 
+-include_lib("riak_core/include/riak_core_vnode.hrl").
 -include("harbinger.hrl").
 
 %% API
--export([]).
+-export([publish/2,
+         bindings/1,
+         bind/2,
+         unbind/2]).
 
 %% Callbacks
 -export([start_vnode/1,
@@ -37,22 +41,64 @@
 %% Types
 %%
 
--record(s, {partition}).
+-record(s, {partition,
+            head = 0                   :: non_neg_integer(),
+            tail = 0                   :: non_neg_integer(),
+            bindings = gb_sets:empty() :: gb_set()}).
+
+-define(TIMEOUT, 5000).
+
+%%
+%% API
+%%
+
+-spec publish(binary(), binary()) -> ok.
+%% @doc
+publish(_Topic, _Payload) ->
+    %% Write the payload to the topic and then the vnodes call
+    %% queue:handle_publish offset reply
+    ok.
+
+-spec bind(binary(), binary()) -> {ok, non_neg_integer(), non_neg_integer()}.
+%% @doc
+bind(Topic, Queue) ->
+    harbinger_coordinator:reply({Topic, Topic},
+                                harbinger_topic,
+                                fun(R) -> {bind, R, {queue, Queue}} end,
+                                ?TOPIC_MASTER).
+
+-spec unbind(binary(), binary()) -> ok.
+%% @doc
+unbind(Topic, Queue) ->
+    harbinger_coordinator:noreply({Topic, Topic},
+                               harbinger_topic,
+                               fun(R) -> {unbind, R, {queue, Queue}} end,
+                               ?TOPIC_MASTER).
+
+bindings(Topic) ->
+    harbinger_coordinator:reply({Topic, Topic},
+                                harbinger_topic,
+                                fun(R) -> {bindings, R} end,
+                                ?TOPIC_MASTER).
 
 %%
 %% Callbacks
 %%
 
-start_vnode(I) -> riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
+start_vnode(Index) -> riak_core_vnode_master:get_vnode_pid(Index, ?MODULE).
 
 init([Partition]) -> {ok, #s{partition = Partition}}.
 
-%% Sample command: respond to a ping
+handle_command({bind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
+    NewState = State#s{bindings = gb_sets:add(Binding, Bindings)},
+    {reply, {ok, ReqId, {State#s.head, State#s.tail}}, NewState};
+handle_command({unbind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
+    NewState = State#s{bindings = gb_sets:delete_any(Binding, Bindings)},
+    {reply, {ok, ReqId}, NewState};
+handle_command({bindings, ReqId}, _Sender, State) ->
+    {reply, {ok, ReqId, gb_sets:to_list(State#s.bindings)}, State};
 handle_command(ping, _Sender, State) ->
-    {reply, {pong, State#s.partition}, State};
-handle_command(Message, _Sender, State) ->
-    lager:info("unhandled_command: ~p", [Message]),
-    {noreply, State}.
+    {reply, {pong, State#s.partition}, State}.
 
 handle_handoff_command(_Message, _Sender, State) ->
     {noreply, State}.

@@ -13,9 +13,8 @@
 -include("harbinger.hrl").
 
 %% API
--export([prepare/2,
-         wait/2,
-         wait/3]).
+-export([reply/4,
+         noreply/4]).
 
 %%
 %% Types
@@ -29,30 +28,23 @@
 %% API
 %%
 
--spec prepare(riak_object:bkey(), atom())
-             -> {ok, request_id(), riak_core_apl:preflist()}.
-%% @doc Prepare the required components for a vnode service request
-prepare(Key, Service) -> {ok, mk_request_id(), get_preflist(Key, Service)}.
+reply(Key, Service, CommandFun, VNodeMaster) ->
+    command(Key, Service, CommandFun, VNodeMaster, fun wait_reply/2).
 
--spec wait(request_id(), pid()) -> ok.
-%% @private Wait for the default number of requests to reply
-wait(ReqId, From) -> wait(ReqId, From, ?W).
-
--spec wait(request_id(), pid(), non_neg_integer()) -> ok.
-%% @private Wait for consistency W requests to reply
-wait(ReqId, From, 0) ->
-    From ! {ReqId, ok},
-    ok;
-wait(ReqId, From, W) ->
-    receive
-        {undefined, {ok, ReqId}} -> wait(ReqId, From, W - 1)
-    after
-        ?TIMEOUT                 -> error({coordinator_wait, timeout_elapsed})
-    end.
+noreply(Key, Service, CommandFun, VNodeMaster) ->
+    command(Key, Service, CommandFun, VNodeMaster, fun wait_noreply/2).
 
 %%
 %% Private
 %%
+
+command(Key, Service, CommandFun, VNodeMaster, ReplyFun) ->
+    ReqId = mk_request_id(),
+    riak_core_vnode_master:command(get_preflist(Key, Service),
+                                   CommandFun(ReqId),
+                                   ?REPLY_SELF,
+                                   VNodeMaster),
+    ReplyFun(ReqId, self()).
 
 -spec mk_request_id() -> request_id().
 %% @private Generate a sudo random request id
@@ -63,3 +55,33 @@ mk_request_id() -> erlang:phash2(erlang:now()).
 get_preflist(Key, Service) ->
     DocIdx = riak_core_util:chash_key(Key),
     riak_core_apl:get_apl(DocIdx, ?N, Service).
+
+-spec wait_noreply(request_id(), pid()) -> ok.
+%% @private Wait_Noreply for the default number of requests to reply
+wait_noreply(ReqId, From) -> wait_noreply(ReqId, From, ?W).
+
+-spec wait_noreply(request_id(), pid(), non_neg_integer()) -> ok.
+%% @private Wait_Noreply for consistency W requests to reply
+wait_noreply(ReqId, From, 0) ->
+    From ! {ReqId, ok},
+    ok;
+wait_noreply(ReqId, From, W) ->
+    receive
+        {undefined, {ok, ReqId}} -> wait_noreply(ReqId, From, W - 1)
+    after
+        ?TIMEOUT                 -> error({coordinator_wait_noreply, timeout_elapsed})
+    end.
+
+wait_reply(ReqId, From) -> wait_reply(ReqId, From, ?W, []).
+
+wait_reply(ReqId, From, 0, Acc) ->
+    From ! {ReqId, ok},
+    {ok, Acc};
+wait_reply(ReqId, From, W, Acc) ->
+    receive
+        {undefined, {ok, ReqId, Wait_Reply}} ->
+            wait_reply(ReqId, From, W - 1, [Wait_Reply|Acc])
+    after
+        ?TIMEOUT ->
+            error({coordinator_wait_reply, timeout_elapsed})
+    end.
