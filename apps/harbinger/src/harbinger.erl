@@ -32,7 +32,7 @@
 
 -spec start() -> ok.
 %% @doc
-start() -> start(?MODULE).
+start() -> application:start(?MODULE).
 
 -spec stop() -> ok.
 %% @doc
@@ -60,13 +60,14 @@ queue(Topic, Queue) ->
 -spec start(normal, _) -> {ok, pid()} | {error, _}.
 %% @hidden
 start(_StartType, _StartArgs) ->
+    ok = riak_core_util:start_app_deps(?MODULE),
     case harbinger_sup:start_link() of
         {ok, Pid} ->
             ok = riak_core_ring_events:add_guarded_handler(harbinger_ring_event_handler, []),
             ok = riak_core_node_watcher_events:add_guarded_handler(harbinger_node_event_handler, []),
             ok = riak_core:register([{vnode_module, harbinger_topic_vnode}]),
-            ok = riak_core_node_watcher:service_up(harbinger_topic, self()),
             ok = riak_core:register([{vnode_module, harbinger_queue_vnode}]),
+            ok = riak_core_node_watcher:service_up(harbinger_topic, self()),
             ok = riak_core_node_watcher:service_up(harbinger_queue, self()),
             {ok, Pid};
         {error, Reason} ->
@@ -81,26 +82,9 @@ stop(_Args) -> ok.
 %% Private
 %%
 
+%% @private
 ping(Key, VNode) ->
     DocIdx = riak_core_util:chash_key(Key),
     [{IdxNode = {_Hash, Host}, _Type}] =
         riak_core_apl:get_primary_apl(DocIdx, 1, harbinger),
     {riak_core_vnode_master:sync_spawn_command(IdxNode, ping, VNode), Host}.
-
--spec start(atom()) -> ok.
-%% @doc
-start(App) -> ensure_started(App, application:start(App, permanent)).
-
--spec ensure_started(atom(), ok | {error, {already_started, atom()} |
-                                   {not_started, atom()}}) -> ok.
-%% @private
-ensure_started(_App, ok) ->
-    ok;
-ensure_started(_App, {error, {already_started, _App}}) ->
-    ok;
-ensure_started(App, {error, {not_started, Dep}}) ->
-    start(Dep),
-    start(App);
-ensure_started(App, {error, Reason}) ->
-    lager:error("Application '~s' start failed with ~p", [App, Reason]),
-    error({app_start_failed, App, Reason}).

@@ -1,4 +1,4 @@
--module(harbinger_queue_vnode).
+-module(riak_zabexample_vnode).
 -behaviour(riak_core_vnode).
 
 %% riak_core_vnode API

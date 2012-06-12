@@ -47,6 +47,11 @@
 -define(R, 2).
 -define(W, 2).
 
+%% VNodes
+-define(TOPIC_MASTER, harbinger_topic_vnode_master).
+-define(QUEUE_MASTER, harbinger_queue_vnode_master).
+-define(REPLY_SELF,   {raw, undefined, self()}).
+
 %%
 %% Tests
 %%

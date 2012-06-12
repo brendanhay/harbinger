@@ -120,8 +120,7 @@ connect(_Frame, State) ->
     send_frame("CONNECTED", Headers, "", State#s{session = Session}).
 
 %% @private
-send(Frame = #stomp_frame{command = _Cmd, headers = _Headers, body = _Body},
-     State) ->
+send(Frame = #stomp_frame{headers = _Headers, body = _Body}, State) ->
     %% Check destination header exists
     case with_headers(["destination"], Frame, State) of
         {ok, [Dest]} ->
@@ -200,12 +199,16 @@ with_headers([H|T], Frame, Acc, State) ->
 %% @private
 split_destination(Dest) ->
     case re:split(Dest, "/") of
-        [<<>>, <<>>, <<>>]     -> invalid;
-        [<<>>, _Topic, <<>>]   -> invalid;
-        [<<>>, Topic]          -> {topic, Topic};
-        [<<>>, Topic, Queue]
-          when size(Queue) > 0 -> {queue, Topic, Queue};
-        _Other                 -> invalid
+        [<<>>, <<>>, <<>>] ->
+            invalid;
+        [<<>>, _Topic, <<>>] ->
+            invalid;
+        [<<>>, Topic] ->
+            {topic, Topic};
+        [<<>>, Topic, Queue] when size(Queue) > 0 ->
+            {queue, Topic, <<Topic/binary, "/", Queue/binary>>};
+        _Other ->
+            invalid
     end.
 
 %%

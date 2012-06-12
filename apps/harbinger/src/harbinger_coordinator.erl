@@ -23,6 +23,8 @@
 
 -type request_id() :: pos_integer().
 
+-define(TIMEOUT, 5000).
+
 %%
 %% API
 %%
@@ -43,7 +45,9 @@ wait(ReqId, From, 0) ->
     ok;
 wait(ReqId, From, W) ->
     receive
-        {ok, ReqId} -> wait(ReqId, From, W - 1)
+        {undefined, {ok, ReqId}} -> wait(ReqId, From, W - 1)
+    after
+        ?TIMEOUT                 -> error({coordinator_wait, timeout_elapsed})
     end.
 
 %%
