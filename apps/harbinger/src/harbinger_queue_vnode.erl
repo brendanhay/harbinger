@@ -1,13 +1,27 @@
+%% This Source Code Form is subject to the terms of
+%% the Mozilla Public License, v. 2.0.
+%% A copy of the MPL can be found in the LICENSE file or
+%% you can obtain it at http://mozilla.org/MPL/2.0/.
+%%
+%% @author Brendan Hay
+%% @copyright (c) 2012 Brendan Hay <brendan@soundcloud.com>
+%% @doc
+%%
+
 -module(harbinger_queue_vnode).
+
 -behaviour(riak_core_vnode).
 
-%% riak_core_vnode API
+-include_lib("riak_core/include/riak_core_vnode.hrl").
+-include("riak_zab_vnode.hrl").
+
+%% API
+-export([hash_key/1]).
+
+%% Callbacks
 -export([start_vnode/1,
          init/1,
-         terminate/2,
          handle_command/3,
-         is_empty/1,
-         delete/1,
          handle_handoff_command/3,
          handoff_starting/2,
          handoff_cancelled/1,
@@ -15,23 +29,30 @@
          handle_handoff_data/2,
          encode_handoff_item/2,
          handle_coverage/4,
-         handle_exit/3]).
+         handle_exit/3,
+         is_empty/1,
+         delete/1,
+         terminate/2]).
 
--export([hash_key/1]).
-
--include_lib("riak_core/include/riak_core_vnode.hrl").
--include("riak_zab_vnode.hrl").
+%%
+%% Types
+%%
 
 -record(state, {logs :: dict()}).
 
-start_vnode(I) ->
-    riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
+%%
+%% API
+%%
 
-init([_Partition]) ->
-    {ok, #state{logs=dict:new()}}.
+hash_key(Key) -> chash:key_of(Key).
 
-hash_key(Key) ->
-    chash:key_of(Key).
+%%
+%% Callbacks
+%%
+
+start_vnode(I) -> riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
+
+init([_Partition]) -> {ok, #state{logs=dict:new()}}.
 
 handle_command(?ZAB_SYNC{peer=Peer, idxs=Idxs}, _Sender, State) ->
     io:format("V: Synchronizing ~p with ~p :: ~p~n", [self(), Peer, Idxs]),
@@ -78,13 +99,6 @@ handle_zab_command({get, Key}, Zxid, Leading, Sender,
 handle_zab_command(_Req, _Zxid, _Leading, _Sender, State) ->
     {noreply, State}.
 
-maybe_reply(true, Sender, Res) ->
-    io:format("Sending reply to ~p :: ~p~n", [Sender, Res]),
-    riak_zab_vnode:reply(Sender, Res),
-    ok;
-maybe_reply(false, _Sender, _Res) ->
-    ok.
-
 handle_handoff_command(Req=?FOLD_REQ{}, Sender, State) ->
     handle_command(Req, Sender, State);
 handle_handoff_command(_Cmd, _Sender, State) ->
@@ -107,6 +121,12 @@ handle_handoff_data(BinObj, State=#state{logs=Logs}) ->
 encode_handoff_item(K, V) ->
     term_to_binary({K,V}).
 
+handle_coverage(_Req, _KeySpaces, _Sender, State) ->
+    {stop, not_implemented, State}.
+
+handle_exit(_Pid, _Reason, State) ->
+    {noreply, State}.
+
 is_empty(State=#state{logs=Logs}) ->
     Empty = (dict:size(Logs) == 0),
     {Empty, State}.
@@ -114,11 +134,16 @@ is_empty(State=#state{logs=Logs}) ->
 delete(State) ->
     {ok, State#state{logs=dict:new()}}.
 
-handle_coverage(_Req, _KeySpaces, _Sender, State) ->
-    {stop, not_implemented, State}.
-
-handle_exit(_Pid, _Reason, State) ->
-    {noreply, State}.
-
 terminate(_Reason, _State) ->
+    ok.
+
+%%
+%% Private
+%%
+
+maybe_reply(true, Sender, Res) ->
+    io:format("Sending reply to ~p :: ~p~n", [Sender, Res]),
+    riak_zab_vnode:reply(Sender, Res),
+    ok;
+maybe_reply(false, _Sender, _Res) ->
     ok.
