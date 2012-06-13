@@ -13,8 +13,7 @@
 -include("harbinger.hrl").
 
 %% API
--export([reply/4,
-         noreply/4]).
+-export([wait/5]).
 
 %%
 %% Types
@@ -28,22 +27,21 @@
 %% API
 %%
 
-reply(Key, Service, CommandFun, VNodeMaster) ->
-    command(Key, Service, CommandFun, VNodeMaster, fun wait_reply/2).
-
-noreply(Key, Service, CommandFun, VNodeMaster) ->
-    command(Key, Service, CommandFun, VNodeMaster, fun wait_noreply/2).
+wait(Key, Service, CmdFun, VMaster, reply) ->
+    command(Key, Service, CmdFun, VMaster, fun reply/2);
+wait(Key, Service, CmdFun, VMaster, noreply) ->
+    command(Key, Service, CmdFun, VMaster, fun noreply/2).
 
 %%
 %% Private
 %%
 
-command(Key, Service, CommandFun, VNodeMaster, ReplyFun) ->
+command(Key, Service, CmdFun, VMaster, ReplyFun) ->
     ReqId = mk_request_id(),
     riak_core_vnode_master:command(get_preflist(Key, Service),
-                                   CommandFun(ReqId),
+                                   CmdFun(ReqId),
                                    ?REPLY_SELF,
-                                   VNodeMaster),
+                                   VMaster),
     ReplyFun(ReqId, self()).
 
 -spec mk_request_id() -> request_id().
@@ -56,32 +54,34 @@ get_preflist(Key, Service) ->
     DocIdx = riak_core_util:chash_key(Key),
     riak_core_apl:get_apl(DocIdx, ?N, Service).
 
--spec wait_noreply(request_id(), pid()) -> ok.
-%% @private Wait_Noreply for the default number of requests to reply
-wait_noreply(ReqId, From) -> wait_noreply(ReqId, From, ?W).
+-spec noreply(request_id(), pid()) -> ok.
+%% @private Noreply for the default number of requests to reply
+noreply(ReqId, From) -> noreply(ReqId, From, ?W).
 
--spec wait_noreply(request_id(), pid(), non_neg_integer()) -> ok.
-%% @private Wait_Noreply for consistency W requests to reply
-wait_noreply(ReqId, From, 0) ->
+-spec noreply(request_id(), pid(), non_neg_integer()) -> ok.
+%% @private Noreply for consistency W requests to reply
+noreply(ReqId, From, 0) ->
     From ! {ReqId, ok},
     ok;
-wait_noreply(ReqId, From, W) ->
+noreply(ReqId, From, W) ->
     receive
-        {undefined, {ok, ReqId}} -> wait_noreply(ReqId, From, W - 1)
-    after
-        ?TIMEOUT                 -> error({coordinator_wait_noreply, timeout_elapsed})
-    end.
-
-wait_reply(ReqId, From) -> wait_reply(ReqId, From, ?W, []).
-
-wait_reply(ReqId, From, 0, Acc) ->
-    From ! {ReqId, ok},
-    {ok, Acc};
-wait_reply(ReqId, From, W, Acc) ->
-    receive
-        {undefined, {ok, ReqId, Wait_Reply}} ->
-            wait_reply(ReqId, From, W - 1, [Wait_Reply|Acc])
+        {undefined, {ok, ReqId}} ->
+            noreply(ReqId, From, W - 1)
     after
         ?TIMEOUT ->
-            error({coordinator_wait_reply, timeout_elapsed})
+            error({coordinator_noreply, timeout_elapsed})
+    end.
+
+reply(ReqId, From) -> reply(ReqId, From, ?W, []).
+
+reply(ReqId, From, 0, Acc) ->
+    From ! {ReqId, ok},
+    {ok, Acc};
+reply(ReqId, From, W, Acc) ->
+    receive
+        {undefined, {ok, ReqId, Reply}} ->
+            reply(ReqId, From, W - 1, [Reply|Acc])
+    after
+        ?TIMEOUT ->
+            error({coordinator_reply, timeout_elapsed})
     end.

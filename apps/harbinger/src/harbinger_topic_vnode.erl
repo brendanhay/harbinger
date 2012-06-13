@@ -53,37 +53,25 @@
 %% API
 %%
 
--spec publish(binary(), binary()) -> ok.
+-spec publish(binary(), binary()) -> {ok, {non_neg_integer(), non_neg_integer()}}.
 %% @doc
 publish(Topic, Payload) ->
-    harbinger_coordinator:noreply({Topic, Topic},
-                               harbinger_topic,
-                               fun(R) -> {publish, R, Payload} end,
-                               ?TOPIC_MASTER).
+    wait(Topic, fun(R) -> {publish, R, Topic, Payload} end, reply).
 
--spec bind(binary(), binary()) -> {ok, non_neg_integer(), non_neg_integer()}.
+-spec bind(binary(), binary()) -> {ok, {non_neg_integer(), non_neg_integer()}}.
 %% @doc
 bind(Topic, Queue) ->
-    harbinger_coordinator:reply({Topic, Topic},
-                                harbinger_topic,
-                                fun(R) -> {bind, R, {queue, Queue}} end,
-                                ?TOPIC_MASTER).
+    wait(Topic, fun(R) -> {bind, R, Topic, Queue} end, reply).
 
 -spec unbind(binary(), binary()) -> ok.
 %% @doc
 unbind(Topic, Queue) ->
-    harbinger_coordinator:noreply({Topic, Topic},
-                               harbinger_topic,
-                               fun(R) -> {unbind, R, {queue, Queue}} end,
-                               ?TOPIC_MASTER).
+    wait(Topic, fun(R) -> {unbind, R, Topic, Queue} end, noreply).
 
 -spec bindings(binary()) -> {ok, [{queue, binary()}]}.
 %% @doc
 bindings(Topic) ->
-    harbinger_coordinator:reply({Topic, Topic},
-                                harbinger_topic,
-                                fun(R) -> {bindings, R} end,
-                                ?TOPIC_MASTER).
+    wait(Topic, fun(R) -> {bindings, R, Topic} end, reply).
 
 %%
 %% Callbacks
@@ -94,22 +82,22 @@ start_vnode(Index) -> riak_core_vnode_master:get_vnode_pid(Index, ?MODULE).
 init([Partition]) -> {ok, #s{partition = Partition}}.
 
 %% Publish
-handle_command({publish, ReqId, Payload}, _Sender, State = #s{tail = Tail, log = Log}) ->
+handle_command({publish, ReqId, _Topic, Payload}, _Sender, State = #s{tail = Tail, log = Log}) ->
     NewState = State#s{log = [Payload|Log], tail = Tail + 1},
-    {reply, {ok, ReqId}, NewState};
+    {reply, {ok, ReqId, {State#s.head, State#s.tail}}, NewState};
 
 %% Bind
-handle_command({bind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
-    NewState = State#s{bindings = gb_sets:add(Binding, Bindings)},
+handle_command({bind, ReqId, Topic, Queue}, _Sender, State = #s{bindings = Bindings}) ->
+    NewState = State#s{bindings = gb_sets:add(Queue, Bindings)},
     {reply, {ok, ReqId, {State#s.head, State#s.tail}}, NewState};
 
 %% Unbind
-handle_command({unbind, ReqId, Binding}, _Sender, State = #s{bindings = Bindings}) ->
-    NewState = State#s{bindings = gb_sets:delete_any(Binding, Bindings)},
+handle_command({unbind, ReqId, _Topic, Queue}, _Sender, State = #s{bindings = Bindings}) ->
+    NewState = State#s{bindings = gb_sets:delete_any(Queue, Bindings)},
     {reply, {ok, ReqId}, NewState};
 
 %% Bindings
-handle_command({bindings, ReqId}, _Sender, State) ->
+handle_command({bindings, ReqId, _Topic}, _Sender, State) ->
     {reply, {ok, ReqId, gb_sets:to_list(State#s.bindings)}, State};
 
 %% Ping
@@ -148,3 +136,15 @@ delete(State) ->
 
 terminate(_Reason, _State) ->
     ok.
+
+%%
+%% Private
+%%
+
+%% @private
+wait(Topic, CmdFun, Mode) ->
+    harbinger_coordinator:wait({Topic, Topic},
+                               harbinger_topic,
+                               CmdFun,
+                               ?TOPIC_MASTER,
+                               Mode).

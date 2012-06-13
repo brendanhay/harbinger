@@ -7,7 +7,7 @@ DEPS=deps/*/ebin
 # Targets
 #
 
-all: deps compile xref
+all: deps compile
 
 compile:
 	$(REBAR) compile

@@ -18,9 +18,7 @@
 %% API
 -export([start/0,
          stop/0,
-         topic/0,
-         queue/0,
-         queue/2]).
+         topic/0]).
 
 %% Callbacks
 -export([start/2,
@@ -42,16 +40,9 @@ stop() ->
 
 %% @doc Ping a random topic vnode
 topic() ->
-    ping({<<"ping">>, term_to_binary(now())}, harbinger_topic_vnode_master).
-
-%% @doc Ping a random queue vnode
-queue() ->
-    ping({<<"ping">>, term_to_binary(now())}, harbinger_queue_vnode_master).
-
-%% @doc Ping a specific queue vnode
-queue(Topic, Queue) ->
-    ping({list_to_binary(Topic), list_to_binary(Queue)},
-         harbinger_queue_vnode_master).
+    ping({<<"ping">>, term_to_binary(now())},
+         ?TOPIC_MASTER,
+         harbinger_topic).
 
 %%
 %% Callbacks
@@ -83,8 +74,11 @@ stop(_Args) -> ok.
 %%
 
 %% @private
-ping(Key, VNode) ->
+ping(Key, VMaster, Service) ->
     DocIdx = riak_core_util:chash_key(Key),
-    [{IdxNode = {_Hash, Host}, _Type}] =
-        riak_core_apl:get_primary_apl(DocIdx, 1, harbinger),
-    {riak_core_vnode_master:sync_spawn_command(IdxNode, ping, VNode), Host}.
+    case riak_core_apl:get_primary_apl(DocIdx, 1, Service) of
+        [{IdxNode = {_Hash, Host}, _Type}] ->
+            {riak_core_vnode_master:sync_spawn_command(IdxNode, ping, VMaster), Host};
+        Other ->
+            lager:error("Unexpected PrefList: ~p", [Other])
+    end.

@@ -12,6 +12,8 @@
 
 -behaviour(supervisor).
 
+-include("harbinger.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -43,10 +45,10 @@ init(_Args) ->
              {connection_master_sup,
               {harbinger_connection_sup, start_link, []},
               permanent, 5000, worker, [harbinger_connection_sup]},
-             {topic_vnode_master,
+             {?TOPIC_MASTER,
               {riak_core_vnode_master, start_link, [harbinger_topic_vnode]},
               permanent, 5000, worker, [riak_core_vnode_master]},
-             {queue_vnode_master,
+             {?QUEUE_MASTER,
               {riak_core_vnode_master, start_link, [harbinger_queue_vnode]},
               permanent, 5000, worker, [riak_core_vnode_master]}],
     {ok, {{one_for_one, 5, 10}, Specs}}.

@@ -20,7 +20,7 @@
 -export([hash_key/1,
          subscribe/2,
          unsubscribe/1,
-         handle_publish/2]).
+         notify/3]).
 
 %% Callbacks
 -export([start_vnode/1,
@@ -66,9 +66,10 @@ unsubscribe(_Queue) ->
     %% Now what, crash all the connected connections?
     ok.
 
--spec handle_publish(binary(), pos_integer()) -> ok.
+%% -spec handle_publish(binary(), pos_integer()) -> ok.
 %% @doc
-handle_publish(_Queue, _NewestOffset) ->
+notify(Topic, Queue, {Head, Tail}) ->
+    riak_zab_util:command(Queue, {bound, Topic, Head, Tail}, ?QUEUE_MASTER),
     %% Notify the ensemble of the updated offset
     ok.
 
@@ -78,7 +79,7 @@ hash_key(Key) -> chash:key_of(Key).
 %% Callbacks
 %%
 
-start_vnode(I) -> riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
+start_vnode(Index) -> riak_core_vnode_master:get_vnode_pid(Index, ?MODULE).
 
 init([_Partition]) -> {ok, #state{logs=dict:new()}}.
 
@@ -104,6 +105,12 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State=#state{logs=Log
 handle_command(_Cmd, _Sender, State) ->
     {noreply, State}.
 
+handle_zab_command(Msg = {bound, _Topic, _Head, _Tail}, Zxid, Leading, _Sender, State) ->
+    io:format("Received store~n"
+              "     Zxid: ~p~n"
+              "  Leading: ~p~n"
+              "      Msg: ~p~n",  [Zxid, Leading, Msg]),
+    {reply, ok, State};
 handle_zab_command({store, Key, Msg}, Zxid, Leading, _Sender,
                    State=#state{logs=Logs}) ->
     Logs2 = dict:append(Key, Msg, Logs),
