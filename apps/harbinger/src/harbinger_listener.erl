@@ -72,6 +72,6 @@ sock_opts() -> [binary, {active, once}, {packet, 0}, {linger, {false, 0}}].
 -spec new_connection(inet:socket(), #s{}) -> {ok, #s{}}.
 %% @hidden
 new_connection(Sock, State) ->
-    {ok, _SupPid, ReaderPid} = harbinger_connection_sup:start_child(Sock),
+    {ok, _SupPid, ReaderPid} = harbinger_connection_sup_sup:start_child(Sock),
     ok = harbinger_reader:handoff_socket(ReaderPid, Sock),
     {ok, State}.
